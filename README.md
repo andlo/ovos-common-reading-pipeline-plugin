@@ -163,6 +163,31 @@ produce false positives on short strings (e.g. "andrew lang" scoring
 meaning) - 0.85 is a safer default. Verify empirically for your own
 alias list.
 
+### Language handling
+
+Every provider in this family handles the device's language one of two
+ways:
+
+- **Fixed set of supported languages, no translation** (`ovos-skill-andersen-tales`,
+  `ovos-skill-grimm-tales`, `ovos-skill-andrew-lang-tales`): checks a
+  `SUPPORTED_LANGUAGES` set at the *top of `initialize()`*, before
+  building any index or registering any bus events. On an unsupported
+  device language, the provider logs why and stays completely inert -
+  never loads an index, never listens for `ovos.common_reading.search` -
+  rather than loading fully and silently declining every search.
+- **Machine translation** (`ovos-skill-ovosblog`, `ovos-skill-arxiv-papers`):
+  always loads (it can't know in advance whether a translation plugin
+  will be configured), matches search phrases against *translated*
+  titles, and declines per-search rather than per-load if no translator
+  is available.
+
+Neither pattern ever silently serves the wrong language - the difference
+is only *when* the provider decides it can't help (once, at load time,
+if it has no way to translate; or per-search, if it might). See
+[ovos-skill-common-reading-example](https://github.com/andlo/ovos-skill-common-reading-example)'s
+module docstring (decision points #1 and #4) for the full reasoning
+behind picking one over the other for your own provider.
+
 ## Category
 **Entertainment**
 
