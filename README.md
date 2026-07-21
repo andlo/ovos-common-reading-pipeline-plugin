@@ -54,7 +54,7 @@ there's nothing to read:
 
 - [ovos-skill-andersen-tales](https://github.com/andlo/ovos-skill-andersen-tales) - Hans Christian Andersen fairy tales
 - [ovos-skill-grimm-tales](https://github.com/andlo/ovos-skill-grimm-tales) - Brothers Grimm fairy tales
-- [ovos-skill-andrew-lang-tales](https://github.com/andlo/ovos-skill-andrew-lang-tales) - Andrew Lang's Fairy Books (Project Gutenberg)
+- [ovos-skill-andrew-lang-tales](https://github.com/andlo/ovos-skill-andrew-lang-tales) - Andrew Lang's Fairy Books (Project Gutenberg, English only, no translation)
 - [ovos-skill-ovosblog](https://github.com/andlo/ovos-skill-ovosblog) - the OpenVoiceOS blog, with machine-translation support
 - [ovos-skill-arxiv-papers](https://github.com/andlo/ovos-skill-arxiv-papers) - arXiv paper abstracts (`content_type: "paper"`)
 
