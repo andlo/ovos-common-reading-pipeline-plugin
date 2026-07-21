@@ -1,0 +1,5 @@
+(Tell|Read) (me| ) a (story|book|article|poem) from {collection}
+(Tell|Read) (me| ) the (story|book|article|poem) {title} from {collection}
+(Tell|Read) (me| ) a {collection} (story|book|article|poem)
+(Tell|Read) (me| ) a {collection} (story|book|article|poem) about {title}
+Find {title} by {collection}

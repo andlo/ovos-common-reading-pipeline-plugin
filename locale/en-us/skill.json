@@ -1,17 +1,22 @@
 {
-  "skill_id": "ovos-skill-common-tales.andlo",
-  "source": "https://github.com/andlo/ovos-skill-common-tales",
-  "package_name": "ovos-skill-common-tales",
-  "pip_spec": "ovos-skill-common-tales",
+  "skill_id": "ovos-skill-common-reading.andlo",
+  "source": "https://github.com/andlo/ovos-skill-common-reading",
+  "package_name": "ovos-skill-common-reading",
+  "pip_spec": "ovos-skill-common-reading",
   "license": "GPL-3.0-or-later",
   "author": "andlo",
-  "name": "Common Tales",
-  "description": "Orchestrates 'tell me a story' across storyteller provider skills (Andersen, Grimm, Andrew Lang, and more), similar to how OCP orchestrates media playback.",
+  "name": "Common Reading",
+  "description": "Orchestrates 'read me something' across content provider skills (fairy tales, books, articles and more), similar to how OCP orchestrates media playback.",
   "examples": [
     "tell me a story about Cinderella",
-    "read me a fairy tale",
-    "continue the story"
+    "read me a story from Grimm",
+    "continue"
   ],
-  "tags": ["entertainment", "stories", "fairytales", "orchestrator"],
-  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-common-tales/main/story-512.png"
+  "tags": [
+    "entertainment",
+    "reading",
+    "stories",
+    "orchestrator"
+  ],
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-common-reading/main/story-512.png"
 }

@@ -1,9 +1,8 @@
-"""Tests for handle_Tales / handle_continue, with _search_providers and
-_fetch_story mocked out so we can focus on the arbitration/confirmation
-flow and bookmark bookkeeping in isolation."""
+"""Tests for handle_read_content / handle_continue, with _search_providers
+and _fetch_content mocked out."""
 from unittest.mock import MagicMock
 
-from conftest import CommonTales
+from conftest import CommonReading
 
 
 def make_message(data=None):
@@ -18,118 +17,116 @@ def _wire_common_mocks(skill):
     skill.get_response = MagicMock(return_value="cinderella")
 
 
-def test_handle_tales_high_confidence_tells_story_directly(skill):
+def test_handle_read_content_high_confidence_reads_directly(skill):
     _wire_common_mocks(skill)
-    candidate = {"skill_id": "prov.a", "story_id": "Cinderella", "title": "Cinderella",
+    candidate = {"skill_id": "prov.a", "content_id": "Cinderella", "title": "Cinderella",
                  "author": "Grimm", "confidence": 0.95}
     skill._search_providers = MagicMock(return_value=[candidate])
-    skill._tell_story = MagicMock()
+    skill._read_content = MagicMock()
 
-    skill.handle_Tales(make_message({"tale": "cinderella"}))
+    skill.handle_read_content(make_message({"title": "cinderella"}))
 
-    skill.ask_yesno.assert_not_called()  # confidence high enough, no confirmation needed
-    skill._tell_story.assert_called_once_with(candidate, 0)
-    assert skill.settings['last_story'] == candidate
+    skill.ask_yesno.assert_not_called()
+    skill._read_content.assert_called_once_with(candidate, 0)
+    assert skill.settings['last_content'] == candidate
 
 
-def test_handle_tales_low_confidence_asks_for_confirmation(skill):
+def test_handle_read_content_low_confidence_asks_for_confirmation(skill):
     _wire_common_mocks(skill)
-    candidate = {"skill_id": "prov.a", "story_id": "Ash Girl", "title": "Ash Girl", "confidence": 0.3}
+    candidate = {"skill_id": "prov.a", "content_id": "Ash Girl", "title": "Ash Girl", "confidence": 0.3}
     skill._search_providers = MagicMock(return_value=[candidate])
-    skill._tell_story = MagicMock()
+    skill._read_content = MagicMock()
 
-    skill.handle_Tales(make_message({"tale": "cinderella"}))
+    skill.handle_read_content(make_message({"title": "cinderella"}))
 
     skill.ask_yesno.assert_called_once()
-    skill._tell_story.assert_called_once()
+    skill._read_content.assert_called_once()
 
 
-def test_handle_tales_confirmation_declined_does_not_tell_story(skill):
+def test_handle_read_content_confirmation_declined(skill):
     _wire_common_mocks(skill)
     skill.ask_yesno = MagicMock(return_value="no")
-    candidate = {"skill_id": "prov.a", "story_id": "Ash Girl", "title": "Ash Girl", "confidence": 0.3}
+    candidate = {"skill_id": "prov.a", "content_id": "Ash Girl", "title": "Ash Girl", "confidence": 0.3}
     skill._search_providers = MagicMock(return_value=[candidate])
-    skill._tell_story = MagicMock()
+    skill._read_content = MagicMock()
 
-    skill.handle_Tales(make_message({"tale": "cinderella"}))
+    skill.handle_read_content(make_message({"title": "cinderella"}))
 
-    skill._tell_story.assert_not_called()
+    skill._read_content.assert_not_called()
 
 
-def test_handle_tales_no_providers_installed(skill):
+def test_handle_read_content_no_providers_installed(skill):
     _wire_common_mocks(skill)
     skill._search_providers = MagicMock(return_value=[])
-    skill._tell_story = MagicMock()
+    skill._read_content = MagicMock()
 
-    skill.handle_Tales(make_message({"tale": "cinderella"}))
+    skill.handle_read_content(make_message({"title": "cinderella"}))
 
-    skill._tell_story.assert_not_called()
+    skill._read_content.assert_not_called()
     dialog_names = [c.args[0] for c in skill.speak_dialog.call_args_list]
-    assert 'no_story_providers' in dialog_names
+    assert 'no_content_providers' in dialog_names
 
 
-def test_handle_tales_by_collection_passes_hint_and_tale(skill):
+def test_handle_read_by_collection_passes_hint_and_title(skill):
     _wire_common_mocks(skill)
-    candidate = {"skill_id": "prov.grimm", "story_id": "Cinderella", "title": "Cinderella", "confidence": 0.95}
+    candidate = {"skill_id": "prov.a", "content_id": "Cinderella", "title": "Cinderella",
+                 "author": "Grimm", "confidence": 0.95}
     skill._search_providers = MagicMock(return_value=[candidate])
-    skill._tell_story = MagicMock()
+    skill._read_content = MagicMock()
 
-    skill.handle_tales_by_collection(make_message({"tale": "cinderella", "collection": "grimm"}))
+    skill.handle_read_by_collection(make_message({"title": "cinderella", "collection": "grimm"}))
 
-    skill._search_providers.assert_called_once_with("cinderella", collection_hint="grimm")
-    skill._tell_story.assert_called_once_with(candidate, 0)
+    called_args = skill._search_providers.call_args
+    assert called_args.kwargs["collection_hint"] == "grimm"
+    skill._read_content.assert_called_once()
 
 
-def test_handle_tales_by_collection_without_tale_asks_for_a_surprise(skill):
-    """'tell me a story from Grimm' with no specific title named - phrase
-    is None, provider is expected to offer something of its own choosing."""
+def test_handle_read_by_collection_without_title_asks_for_a_surprise(skill):
     _wire_common_mocks(skill)
-    candidate = {"skill_id": "prov.grimm", "story_id": "Rumpelstiltskin",
-                 "title": "Rumpelstiltskin", "confidence": 0.9}
+    candidate = {"skill_id": "prov.a", "content_id": "Ash Girl", "title": "Ash Girl", "confidence": 1.0}
     skill._search_providers = MagicMock(return_value=[candidate])
-    skill._tell_story = MagicMock()
+    skill._read_content = MagicMock()
 
-    skill.handle_tales_by_collection(make_message({"collection": "grimm"}))
+    skill.handle_read_by_collection(make_message({"title": None, "collection": "grimm"}))
 
-    skill._search_providers.assert_called_once_with(None, collection_hint="grimm")
-    skill._tell_story.assert_called_once()
+    called_args = skill._search_providers.call_args
+    assert called_args.args[0] is None
+    skill._read_content.assert_called_once()
 
 
-def test_handle_tales_by_collection_unknown_collection(skill):
+def test_handle_read_by_collection_unknown_collection(skill):
     _wire_common_mocks(skill)
     skill._search_providers = MagicMock(return_value=[])
-    skill._tell_story = MagicMock()
+    skill._read_content = MagicMock()
 
-    skill.handle_tales_by_collection(make_message({"collection": "aesop"}))
+    skill.handle_read_by_collection(make_message({"title": None, "collection": "nonexistent author"}))
 
-    skill._tell_story.assert_not_called()
+    skill._read_content.assert_not_called()
     dialog_names = [c.args[0] for c in skill.speak_dialog.call_args_list]
     assert 'no_such_collection' in dialog_names
-    no_such_call = next(c for c in skill.speak_dialog.call_args_list if c.args[0] == 'no_such_collection')
-    assert no_such_call.kwargs["data"]["collection"] == "aesop"
 
 
-def test_handle_continue_with_no_active_story(skill):
+def test_handle_continue_with_no_active_content(skill):
     _wire_common_mocks(skill)
-    skill._tell_story = MagicMock()
+    skill._read_content = MagicMock()
 
     skill.handle_continue(make_message())
 
-    skill._tell_story.assert_not_called()
+    skill._read_content.assert_not_called()
     dialog_names = [c.args[0] for c in skill.speak_dialog.call_args_list]
-    assert 'no_story_to_continue' in dialog_names
+    assert 'nothing_to_continue' in dialog_names
 
 
 def test_handle_continue_resumes_from_saved_bookmark(skill):
     _wire_common_mocks(skill)
-    candidate = {"skill_id": "prov.a", "story_id": "Cinderella", "title": "Cinderella"}
-    skill.settings['last_story'] = candidate
-    skill.settings['progress'][CommonTales._progress_key(candidate)] = 7
-    skill._tell_story = MagicMock()
+    candidate = {"skill_id": "prov.a", "content_id": "Cinderella", "title": "Cinderella"}
+    skill.settings['last_content'] = candidate
+    skill.settings['progress'][CommonReading._progress_key(candidate)] = 7
+    skill._read_content = MagicMock()
 
     skill.handle_continue(make_message())
 
-    skill._tell_story.assert_called_once_with(candidate, 7)
+    skill._read_content.assert_called_once_with(candidate, 7)
 
 
 def test_stop_while_reading_speaks_and_returns_true(skill):

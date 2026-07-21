@@ -1,7 +1,5 @@
-"""Tests for the pure candidate-selection and description helpers - the
-core arbitration logic, deliberately kept free of any bus mechanics so it
-can be tested directly."""
-from conftest import pick_best_candidate, CommonTales
+"""Tests for the pure candidate-selection and description helpers."""
+from conftest import pick_best_candidate, CommonReading
 
 
 def test_pick_best_candidate_picks_highest_confidence():
@@ -20,7 +18,7 @@ def test_pick_best_candidate_empty_list_returns_none():
 
 def test_pick_best_candidate_missing_confidence_defaults_to_zero():
     candidates = [
-        {"skill_id": "a", "title": "X"},  # no 'confidence' key at all
+        {"skill_id": "a", "title": "X"},
         {"skill_id": "b", "title": "Y", "confidence": 0.1},
     ]
     best = pick_best_candidate(candidates)
@@ -34,21 +32,21 @@ def test_describe_includes_all_present_fields():
         "collection": "Household Tales",
         "source": "grimmstories.com",
     }
-    assert CommonTales._describe(candidate) == (
+    assert CommonReading._describe(candidate) == (
         "Cinderella, by Brothers Grimm, from Household Tales, sourced from grimmstories.com"
     )
 
 
 def test_describe_gracefully_skips_missing_fields():
     candidate = {"title": "Cinderella", "author": "", "source": "grimmstories.com"}
-    assert CommonTales._describe(candidate) == "Cinderella, sourced from grimmstories.com"
+    assert CommonReading._describe(candidate) == "Cinderella, sourced from grimmstories.com"
 
 
 def test_describe_title_only():
     candidate = {"title": "Cinderella"}
-    assert CommonTales._describe(candidate) == "Cinderella"
+    assert CommonReading._describe(candidate) == "Cinderella"
 
 
-def test_progress_key_combines_skill_and_story_id():
-    candidate = {"skill_id": "ovos-skill-grimm-tales.andlo", "story_id": "Cinderella"}
-    assert CommonTales._progress_key(candidate) == "ovos-skill-grimm-tales.andlo::Cinderella"
+def test_progress_key_combines_skill_and_content_id():
+    candidate = {"skill_id": "ovos-skill-grimm-tales.andlo", "content_id": "Cinderella"}
+    assert CommonReading._progress_key(candidate) == "ovos-skill-grimm-tales.andlo::Cinderella"

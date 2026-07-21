@@ -1,22 +1,22 @@
 {
-  "skill_id": "ovos-skill-common-tales.andlo",
-  "source": "https://github.com/andlo/ovos-skill-common-tales",
-  "package_name": "ovos-skill-common-tales",
-  "pip_spec": "ovos-skill-common-tales",
+  "skill_id": "ovos-skill-common-reading.andlo",
+  "source": "https://github.com/andlo/ovos-skill-common-reading",
+  "package_name": "ovos-skill-common-reading",
+  "pip_spec": "ovos-skill-common-reading",
   "license": "GPL-3.0-or-later",
   "author": "andlo",
-  "name": "Historiefortæller",
-  "description": "Formidler 'fortæl mig en historie' på tværs af historiefortæller-skills (Andersen, Grimm, Andrew Lang og flere).",
+  "name": "Fælles Læsning",
+  "description": "Formidler 'læs noget for mig' på tværs af indholds-skills (eventyr, bøger, artikler og mere).",
   "examples": [
     "fortæl historien om Askepot",
-    "læs et eventyr",
-    "fortsæt historien"
+    "læs en historie fra Grimm",
+    "fortsæt"
   ],
   "tags": [
     "underholdning",
+    "laesning",
     "historier",
-    "eventyr",
     "orchestrator"
   ],
-  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-common-tales/main/story-512.png"
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-common-reading/main/story-512.png"
 }

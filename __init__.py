@@ -1,5 +1,5 @@
 """
-skill OVOS Common Tales
+skill OVOS Common Reading
 Copyright (C) 2026  Andreas Lorensen
 
 This program is free software: you can redistribute it and/or modify
@@ -17,19 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ---
 
-This skill orchestrates 'tell me a story' across *provider* skills
-(ovos-skill-andersen-tales, ovos-skill-grimm-tales,
-ovos-skill-andrew-lang-tales, and any future ones), the same way OCP
-(ovos-common-play) orchestrates 'play X' across media skills:
+This skill orchestrates 'read me something' across *provider* skills
+(fairy tale collections, but also potentially books, articles, poems, and
+any other text-based content), the same way OCP (ovos-common-play)
+orchestrates 'play X' across media skills:
 
 - Provider skills own no intents and do no narration - they just answer
-  search/fetch bus requests with story metadata and text.
+  search/fetch bus requests with content metadata and text.
 - This skill owns all the user-facing conversation: intents, the "is it
   that one?" disambiguation, narration pacing, and - importantly -
-  bookmark/'continue' state, which is now tracked in ONE place regardless
-  of which provider last told a story.
+  bookmark/'continue' state, which is tracked in ONE place regardless of
+  which provider last supplied the content.
 
-See README.md for the full ovos.common_tales.* bus protocol.
+See README.md for the full ovos.common_reading.* bus protocol.
 """
 
 from ovos_bus_client.message import Message
@@ -41,21 +41,21 @@ from ovos_utils.process_utils import RuntimeRequirements
 import time
 
 
-class StoryFetchError(Exception):
-    """Raised when a provider skill doesn't answer a fetch_story request
-    in time, or answers with no usable story text."""
+class ContentFetchError(Exception):
+    """Raised when a provider skill doesn't answer a fetch_content
+    request in time, or answers with no usable text."""
 
 
-# ovos.common_tales.* bus protocol - shared by convention (no package
+# ovos.common_reading.* bus protocol - shared by convention (no package
 # dependency) with provider skills, the same way OCP's ovos.common_play.*
 # messages work.
-COMMON_TALES_SEARCH = "ovos.common_tales.search"
-COMMON_TALES_SEARCH_RESPONSE = "ovos.common_tales.search.response"
-COMMON_TALES_FETCH_STORY = "ovos.common_tales.fetch_story"  # + ".{provider_skill_id}"
-COMMON_TALES_FETCH_STORY_RESPONSE = "ovos.common_tales.fetch_story.response"
+COMMON_READING_SEARCH = "ovos.common_reading.search"
+COMMON_READING_SEARCH_RESPONSE = "ovos.common_reading.search.response"
+COMMON_READING_FETCH_CONTENT = "ovos.common_reading.fetch_content"  # + ".{provider_skill_id}"
+COMMON_READING_FETCH_CONTENT_RESPONSE = "ovos.common_reading.fetch_content.response"
 
 SEARCH_TIMEOUT = 2.0  # seconds to wait for provider skills to answer a search
-FETCH_TIMEOUT = 10.0  # seconds to wait for the winning provider to deliver story text
+FETCH_TIMEOUT = 10.0  # seconds to wait for the winning provider to deliver text
 CONFIDENCE_THRESHOLD = 0.8
 
 
@@ -69,7 +69,7 @@ def pick_best_candidate(candidates):
     return max(candidates, key=lambda c: c.get("confidence", 0))
 
 
-class CommonTales(OVOSSkill):
+class CommonReading(OVOSSkill):
 
     @classproperty
     def runtime_requirements(self):
@@ -87,73 +87,74 @@ class CommonTales(OVOSSkill):
 
     def initialize(self):
         self.is_reading = False
-        # progress is keyed by "{provider_skill_id}::{story_id}" so stories
-        # from different providers never collide, mirroring the per-title
-        # progress tracking ovos-skill-fairytales already does, just now
-        # spanning multiple provider skills instead of just one
+        # progress is keyed by "{provider_skill_id}::{content_id}" so
+        # content from different providers never collides, mirroring the
+        # per-title progress tracking ovos-skill-fairytales already did,
+        # just now spanning multiple provider skills instead of just one
         self.settings.setdefault('progress', {})
-        self.settings.setdefault('last_story', None)  # candidate dict, see pick_best_candidate
+        self.settings.setdefault('last_content', None)  # candidate dict, see pick_best_candidate
 
-    @intent_handler('Tales.intent')
-    def handle_Tales(self, message: Message):
-        if message.data.get("tale", "") is None:
-            response = self.get_response('Tales', num_retries=1)
+    @intent_handler('ReadContent.intent')
+    def handle_read_content(self, message: Message):
+        if message.data.get("title", "") is None:
+            response = self.get_response('ReadContent', num_retries=1)
             if not response:
                 return
         else:
-            response = message.data.get("tale")
-        self._search_and_tell(response)
+            response = message.data.get("title")
+        self._search_and_read(response)
 
-    @intent_handler('TalesByCollection.intent')
-    def handle_tales_by_collection(self, message: Message):
-        """Handles phrasings that name a specific collection/author, e.g.
-        'tell me a story from Grimm' or 'find Cinderella by Andersen'.
-        {tale} is optional here - 'a story from Grimm' with no specific
-        tale named is a valid 'surprise me' request to that collection."""
+    @intent_handler('ReadContentByCollection.intent')
+    def handle_read_by_collection(self, message: Message):
+        """Handles phrasings that name a specific collection/author/
+        publication, e.g. 'read me a story from Grimm' or 'find
+        Cinderella by Andersen'. {title} is optional here - 'a story
+        from Grimm' with no specific title named is a valid 'surprise
+        me' request to that collection."""
         collection_hint = message.data.get("collection")
-        tale = message.data.get("tale")
-        self._search_and_tell(tale, collection_hint=collection_hint)
-
-    def _search_and_tell(self, phrase, collection_hint=None):
-        candidates = self._search_providers(phrase, collection_hint=collection_hint)
-        if not candidates:
-            if collection_hint:
-                self.speak_dialog('no_such_collection', data={"collection": collection_hint})
-            else:
-                self.speak_dialog('no_story_providers')
-            return
-
-        best = pick_best_candidate(candidates)
-        if best["confidence"] < CONFIDENCE_THRESHOLD:
-            self.speak_dialog('that_would_be', data={"story": best["title"]})
-            confirm = self.ask_yesno('is_it_that')
-            if not confirm or confirm == 'no':
-                self.speak_dialog('no_story')
-                return
-
-        self._announce_and_tell(best, bookmark=0)
+        title = message.data.get("title")
+        self._search_and_read(title, collection_hint=collection_hint)
 
     @intent_handler('continue.intent')
     def handle_continue(self, message: Message):
-        last = self.settings.get('last_story')
+        last = self.settings.get('last_content')
         if not last:
-            self.speak_dialog('no_story_to_continue')
+            self.speak_dialog('nothing_to_continue')
             return
-        self.speak_dialog('continue', data={"story": last["title"]}, wait=True)
+        self.speak_dialog('continue', data={"title": last["title"]}, wait=True)
         key = self._progress_key(last)
         bookmark = self.settings.get('progress', {}).get(key, 0)
-        self._tell_story(last, bookmark)
+        self._read_content(last, bookmark)
 
     def stop(self):
         if self.is_reading is True:
-            self.speak_dialog('stop_telling_tales')
+            self.speak_dialog('stop_reading')
             self.is_reading = False
             return True
         return False
 
+    def _search_and_read(self, phrase, collection_hint=None, content_type=None):
+        candidates = self._search_providers(phrase, collection_hint=collection_hint, content_type=content_type)
+        if not candidates:
+            if collection_hint:
+                self.speak_dialog('no_such_collection', data={"collection": collection_hint})
+            else:
+                self.speak_dialog('no_content_providers')
+            return
+
+        best = pick_best_candidate(candidates)
+        if best["confidence"] < CONFIDENCE_THRESHOLD:
+            self.speak_dialog('that_would_be', data={"title": best["title"]})
+            confirm = self.ask_yesno('is_it_that')
+            if not confirm or confirm == 'no':
+                self.speak_dialog('no_content')
+                return
+
+        self._announce_and_read(best, bookmark=0)
+
     @staticmethod
     def _progress_key(candidate):
-        return f"{candidate['skill_id']}::{candidate['story_id']}"
+        return f"{candidate['skill_id']}::{candidate['content_id']}"
 
     @staticmethod
     def _describe(candidate):
@@ -169,60 +170,66 @@ class CommonTales(OVOSSkill):
             parts.append(f"sourced from {candidate['source']}")
         return ", ".join(parts)
 
-    def _search_providers(self, phrase, collection_hint=None, timeout=SEARCH_TIMEOUT):
+    def _search_providers(self, phrase, collection_hint=None, content_type=None, timeout=SEARCH_TIMEOUT):
         """Broadcast a search to every provider skill and collect all
-        responses for a short window (unlike _fetch_story, several
+        responses for a short window (unlike _fetch_content, several
         providers are expected to answer here, not just one).
 
         collection_hint (optional) is a raw, unvalidated string like
-        'grimm' or 'h c andersen' extracted from phrasings such as 'tell
-        me a story from Grimm' - providers match it fuzzily against their
-        own known friendly names and should only respond if it's a match
-        (or if collection_hint is None, in which case everyone competes
-        as usual)."""
+        'grimm' or 'h c andersen' - providers match it fuzzily against
+        their own known friendly names and should only respond if it's a
+        match, or if collection_hint is None (in which case everyone
+        competes as usual).
+
+        content_type (optional) is a raw hint like 'story', 'book',
+        'article' or 'poem' - providers that only offer one kind of
+        content may use it to decide whether to respond at all, but
+        should not require it (a provider offering only fairy tales can
+        just ignore this field and always respond)."""
         responses = []
 
         def collect(message):
             responses.append(message.data)
 
-        self.bus.on(COMMON_TALES_SEARCH_RESPONSE, collect)
+        self.bus.on(COMMON_READING_SEARCH_RESPONSE, collect)
         try:
-            self.bus.emit(Message(COMMON_TALES_SEARCH, {
+            self.bus.emit(Message(COMMON_READING_SEARCH, {
                 "phrase": phrase,
                 "collection_hint": collection_hint,
+                "content_type": content_type,
                 "requester": self.skill_id,
             }))
             time.sleep(timeout)
         finally:
-            self.bus.remove(COMMON_TALES_SEARCH_RESPONSE, collect)
+            self.bus.remove(COMMON_READING_SEARCH_RESPONSE, collect)
         return responses
 
-    def _fetch_story(self, candidate, timeout=FETCH_TIMEOUT):
+    def _fetch_content(self, candidate, timeout=FETCH_TIMEOUT):
         skill_id = candidate["skill_id"]
-        request = Message(f"{COMMON_TALES_FETCH_STORY}.{skill_id}",
-                           {"story_id": candidate["story_id"], "requester": self.skill_id})
+        request = Message(f"{COMMON_READING_FETCH_CONTENT}.{skill_id}",
+                           {"content_id": candidate["content_id"], "requester": self.skill_id})
         response = self.bus.wait_for_response(
-            request, reply_type=COMMON_TALES_FETCH_STORY_RESPONSE, timeout=timeout)
+            request, reply_type=COMMON_READING_FETCH_CONTENT_RESPONSE, timeout=timeout)
         if response is None:
-            raise StoryFetchError(f"provider {skill_id} did not respond in time")
+            raise ContentFetchError(f"provider {skill_id} did not respond in time")
         paragraphs = response.data.get("paragraphs")
         if not paragraphs:
-            raise StoryFetchError(f"provider {skill_id} returned no story text for {candidate['story_id']}")
+            raise ContentFetchError(f"provider {skill_id} returned no text for {candidate['content_id']}")
         return paragraphs
 
-    def _announce_and_tell(self, candidate, bookmark):
+    def _announce_and_read(self, candidate, bookmark):
         self.speak_dialog('i_know_that', data={"description": self._describe(candidate)}, wait=True)
-        self.settings['last_story'] = candidate
-        self._tell_story(candidate, bookmark)
+        self.settings['last_content'] = candidate
+        self._read_content(candidate, bookmark)
 
-    def _tell_story(self, candidate, bookmark):
+    def _read_content(self, candidate, bookmark):
         self.is_reading = True
         try:
-            paragraphs = self._fetch_story(candidate)
-        except StoryFetchError as e:
-            self.log.error(f"Could not fetch story: {e}")
+            paragraphs = self._fetch_content(candidate)
+        except ContentFetchError as e:
+            self.log.error(f"Could not fetch content: {e}")
             self.is_reading = False
-            self.speak_dialog('story_unavailable')
+            self.speak_dialog('content_unavailable')
             return
 
         key = self._progress_key(candidate)
@@ -238,5 +245,5 @@ class CommonTales(OVOSSkill):
         if self.is_reading is True:
             self.is_reading = False
             self.settings['progress'].pop(key, None)
-            self.settings['last_story'] = None
-            self.speak_dialog('from_Tales', data={"source": candidate.get("source") or "the storyteller"})
+            self.settings['last_content'] = None
+            self.speak_dialog('finished_reading', data={"source": candidate.get("source") or "the source"})

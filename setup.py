@@ -3,9 +3,9 @@ from setuptools import setup
 from os import walk, path
 
 BASEDIR = path.abspath(path.dirname(__file__))
-URL = "https://github.com/andlo/ovos-skill-common-tales"
-SKILL_CLAZZ = "CommonTales"  # needs to match __init__.py class name
-PYPI_NAME = "ovos-skill-common-tales"  # pip install PYPI_NAME
+URL = "https://github.com/andlo/ovos-skill-common-reading"
+SKILL_CLAZZ = "CommonReading"  # needs to match __init__.py class name
+PYPI_NAME = "ovos-skill-common-reading"  # pip install PYPI_NAME
 
 SKILL_AUTHOR, SKILL_NAME = URL.split(".com/")[-1].split("/")
 SKILL_PKG = SKILL_NAME.lower().replace("-", "_")
@@ -61,7 +61,7 @@ with open("README.md", "r") as f:
 setup(
     name=PYPI_NAME,
     version=get_version(),
-    description="OVOS skill that orchestrates 'tell me a story' across provider skills (like ovos-skill-andersen-tales, ovos-skill-grimm-tales, ovos-skill-andrew-lang-tales), similar in spirit to OCP for media skills",
+    description="OVOS skill that orchestrates 'read me something' across content provider skills (fairy tales, books, articles and more), similar in spirit to OCP for media skills",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url=URL,
@@ -85,6 +85,6 @@ setup(
     packages=[SKILL_PKG],
     include_package_data=True,
     install_requires=get_requirements("requirements.txt"),
-    keywords="ovos skill voice assistant fairytales storytelling orchestrator",
+    keywords="ovos skill voice assistant reading storytelling orchestrator",
     entry_points={"ovos.plugin.skill": PLUGIN_ENTRY_POINT},
 )

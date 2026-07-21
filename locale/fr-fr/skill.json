@@ -1,21 +1,22 @@
 {
-  "skill_id": "ovos-skill-common-tales.andlo",
-  "source": "https://github.com/andlo/ovos-skill-common-tales",
-  "package_name": "ovos-skill-common-tales",
-  "pip_spec": "ovos-skill-common-tales",
+  "skill_id": "ovos-skill-common-reading.andlo",
+  "source": "https://github.com/andlo/ovos-skill-common-reading",
+  "package_name": "ovos-skill-common-reading",
+  "pip_spec": "ovos-skill-common-reading",
   "license": "GPL-3.0-or-later",
   "author": "andlo",
-  "name": "Conteur d'Histoires",
-  "description": "Coordonne « raconte-moi une histoire » entre plusieurs skills conteuses (Andersen, Grimm, Andrew Lang et d'autres).",
+  "name": "Lecture Commune",
+  "description": "Coordonne « lis-moi quelque chose » entre plusieurs skills de contenu (contes, livres, articles et plus).",
   "examples": [
     "raconte-moi l'histoire de Cendrillon",
-    "lis-moi une histoire",
-    "continue l'histoire"
+    "lis-moi une histoire de Grimm",
+    "continue"
   ],
   "tags": [
     "divertissement",
+    "lecture",
     "histoires",
     "orchestrator"
   ],
-  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-common-tales/main/story-512.png"
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-common-reading/main/story-512.png"
 }

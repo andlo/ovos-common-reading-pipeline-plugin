@@ -1,21 +1,22 @@
 {
-  "skill_id": "ovos-skill-common-tales.andlo",
-  "source": "https://github.com/andlo/ovos-skill-common-tales",
-  "package_name": "ovos-skill-common-tales",
-  "pip_spec": "ovos-skill-common-tales",
+  "skill_id": "ovos-skill-common-reading.andlo",
+  "source": "https://github.com/andlo/ovos-skill-common-reading",
+  "package_name": "ovos-skill-common-reading",
+  "pip_spec": "ovos-skill-common-reading",
   "license": "GPL-3.0-or-later",
   "author": "andlo",
-  "name": "Verhalenverteller",
-  "description": "Coördineert 'vertel me een verhaal' tussen meerdere verhalenverteller-skills (Andersen, Grimm, Andrew Lang en meer).",
+  "name": "Gedeeld Voorlezen",
+  "description": "Coördineert 'lees me iets voor' tussen meerdere content-skills (sprookjes, boeken, artikelen en meer).",
   "examples": [
     "vertel me het verhaal van Assepoester",
-    "lees me een verhaal voor",
-    "ga verder met het verhaal"
+    "lees me een verhaal van Grimm voor",
+    "ga verder"
   ],
   "tags": [
     "entertainment",
+    "voorlezen",
     "verhalen",
     "orchestrator"
   ],
-  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-common-tales/main/story-512.png"
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-common-reading/main/story-512.png"
 }

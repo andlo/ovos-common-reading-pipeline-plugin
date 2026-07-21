@@ -1,12 +1,12 @@
 """Smoke tests: the skill module must import cleanly."""
-from conftest import CommonTales, StoryFetchError
+from conftest import CommonReading, ContentFetchError
 
 
 def test_imports_cleanly():
-    assert CommonTales is not None
-    assert issubclass(StoryFetchError, Exception)
+    assert CommonReading is not None
+    assert issubclass(ContentFetchError, Exception)
 
 
-def test_common_tales_is_an_ovos_skill():
+def test_common_reading_is_an_ovos_skill():
     from ovos_workshop.skills import OVOSSkill
-    assert issubclass(CommonTales, OVOSSkill)
+    assert issubclass(CommonReading, OVOSSkill)
