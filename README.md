@@ -55,6 +55,7 @@ there's nothing to read:
 - [ovos-skill-andersen-tales](https://github.com/andlo/ovos-skill-andersen-tales) - Hans Christian Andersen fairy tales
 - [ovos-skill-grimm-tales](https://github.com/andlo/ovos-skill-grimm-tales) - Brothers Grimm fairy tales
 - [ovos-skill-ovosblog](https://github.com/andlo/ovos-skill-ovosblog) - the OpenVoiceOS blog, with machine-translation support
+- [ovos-skill-arxiv](https://github.com/andlo/ovos-skill-arxiv) - arXiv paper abstracts (`content_type: "paper"`)
 - ovos-skill-andrew-lang-tales (planned)
 
 ## Building your own provider
