@@ -47,6 +47,18 @@ def test_describe_title_only():
     assert CommonReading._describe(candidate) == "Cinderella"
 
 
+def test_describe_discloses_machine_translation():
+    candidate = {"title": "Kedelige installationer", "source": "blog.openvoiceos.org", "machine_translated": True}
+    assert CommonReading._describe(candidate) == (
+        "Kedelige installationer, sourced from blog.openvoiceos.org, machine translated"
+    )
+
+
+def test_describe_omits_disclosure_when_not_translated():
+    candidate = {"title": "Boring installs", "source": "blog.openvoiceos.org", "machine_translated": False}
+    assert "machine translated" not in CommonReading._describe(candidate)
+
+
 def test_progress_key_combines_skill_and_content_id():
     candidate = {"skill_id": "ovos-skill-grimm-tales.andlo", "content_id": "Cinderella"}
     assert CommonReading._progress_key(candidate) == "ovos-skill-grimm-tales.andlo::Cinderella"

@@ -38,7 +38,8 @@ pip install ovos-skill-common-reading
 You'll also want at least one *provider* skill installed, otherwise this
 skill has nothing to read:
 
-- [ovos-skill-andersen-tales](https://github.com/andlo/ovos-skill-andersen-tales)
+- [ovos-skill-andersen-tales](https://github.com/andlo/ovos-skill-andersen-tales) - Hans Christian Andersen fairy tales (`content_type: "story"`)
+- [ovos-skill-ovosblog](https://github.com/andlo/ovos-skill-ovosblog) - the OpenVoiceOS blog (`content_type: "article"`) - proof this works for more than fairy tales, with machine-translation support
 - ovos-skill-grimm-tales (planned)
 - ovos-skill-andrew-lang-tales (planned)
 
@@ -114,12 +115,20 @@ ovos.common_reading.search.response
   "author": "<author, optional>",
   "collection": "<book/collection name, optional>",
   "source": "<where the text comes from, e.g. 'grimmstories.com'>",
-  "confidence": 0.0-1.0
+  "confidence": 0.0-1.0,
+  "machine_translated": true/false (optional, defaults falsy)
 }
 ```
 
 This skill picks the highest-confidence response (and, if it's below 0.8,
 confirms with the user before continuing - the "is it that one?" flow).
+
+If a provider sets `"machine_translated": true`, this skill discloses
+that as part of the announcement right before reading starts (e.g.
+"..., machine translated") - see `ovos-skill-ovosblog` for a provider
+that actually uses this (it machine-translates the OpenVoiceOS blog for
+non-English devices, and matches search phrases against the *translated*
+titles, not the English originals - see its README for the reasoning).
 
 ### 2. Fetch
 

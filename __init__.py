@@ -160,7 +160,9 @@ class CommonReading(OVOSSkill):
     def _describe(candidate):
         """Build a spoken description from whatever metadata the winning
         provider supplied - gracefully skipping any fields it left out
-        (not every provider necessarily has a 'collection', for instance)."""
+        (not every provider necessarily has a 'collection', for instance).
+        If the provider flagged 'machine_translated', that's disclosed
+        here too, since this runs right before reading starts."""
         parts = [candidate["title"]]
         if candidate.get("author"):
             parts.append(f"by {candidate['author']}")
@@ -168,6 +170,8 @@ class CommonReading(OVOSSkill):
             parts.append(f"from {candidate['collection']}")
         if candidate.get("source"):
             parts.append(f"sourced from {candidate['source']}")
+        if candidate.get("machine_translated"):
+            parts.append("machine translated")
         return ", ".join(parts)
 
     def _search_providers(self, phrase, collection_hint=None, content_type=None, timeout=SEARCH_TIMEOUT):
