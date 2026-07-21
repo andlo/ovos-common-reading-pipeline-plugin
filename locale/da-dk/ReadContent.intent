@@ -1,2 +1,6 @@
-(Fortæl|Læs) (mig| ) en (god| ) (historie|fortælling|bog|artikel|digt) {title}
-(Fortæl|Læs) (mig| ) (historien|bogen|artiklen|digtet) {title}
+Fortæl mig (en historie|en artikel|en nyhed|et dokument|en rapport) om {title}
+Læs mig (en historie|en artikel|en nyhed|et dokument|en rapport) om {title}
+Fortæl mig historien {title}
+Fortæl mig artiklen {title}
+Læs mig historien {title}
+Fortæl mig om {title}

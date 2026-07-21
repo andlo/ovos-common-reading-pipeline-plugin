@@ -1,4 +1,5 @@
-(Raccontami|Leggimi) qualcosa di {collection}
-(Raccontami|Leggimi) {title} di {collection}
-(Raccontami|Leggimi) una storia di {collection}
+Raccontami (una storia|un articolo|una notizia|un documento|un rapporto) di {collection}
+Leggimi (una storia|un articolo|una notizia|un documento|un rapporto) di {collection}
+Raccontami la storia {title} di {collection}
+Raccontami una storia di {collection} su {title}
 Trova {title} di {collection}

@@ -1,2 +1,6 @@
-(Raccontami|Leggimi) una (bella| ) (storia|un libro|un articolo|una poesia) {title}
-(Raccontami|Leggimi) (la storia|il libro|l'articolo|la poesia) {title}
+Raccontami (una storia|un articolo|una notizia|un documento|un rapporto) su {title}
+Leggimi (una storia|un articolo|una notizia|un documento|un rapporto) su {title}
+Raccontami la storia {title}
+Raccontami l'articolo {title}
+Leggimi la storia {title}
+Parlami di {title}

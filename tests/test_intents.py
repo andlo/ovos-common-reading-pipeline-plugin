@@ -1,8 +1,12 @@
-"""Tests for handle_read_content / handle_continue, with _search_providers
-and _fetch_content mocked out."""
+"""Tests for match() dispatch logic and the underlying _search_and_read /
+_handle_continue / stop behavior. The padacioso IntentContainer itself is
+mocked here (its real matching behavior across all 8 languages is
+verified separately, live, against the actual bundled *.intent files -
+see scripts/build_padacioso_intents.py's docstring) so these tests focus
+on what match() does once it has a result."""
 from unittest.mock import MagicMock
 
-from conftest import CommonReading
+from conftest import CommonReadingPipeline
 
 
 def make_message(data=None):
@@ -11,136 +15,101 @@ def make_message(data=None):
     return m
 
 
-def _wire_common_mocks(skill):
-    skill.speak_dialog = MagicMock()
-    skill.ask_yesno = MagicMock(return_value="yes")
-    skill.get_response = MagicMock(return_value="cinderella")
+def _wire_common_mocks(plugin):
+    plugin.speak_dialog = MagicMock()
+    plugin.ask_yesno = MagicMock(return_value="yes")
 
 
-def test_handle_read_content_high_confidence_reads_directly(skill):
-    _wire_common_mocks(skill)
-    candidate = {"skill_id": "prov.a", "content_id": "Cinderella", "title": "Cinderella",
-                 "author": "Grimm", "confidence": 0.95}
-    skill._search_providers = MagicMock(return_value=[candidate])
-    skill._read_content = MagicMock()
-
-    skill.handle_read_content(make_message({"title": "cinderella"}))
-
-    skill.ask_yesno.assert_not_called()
-    skill._read_content.assert_called_once_with(candidate, 0)
-    assert skill.settings['last_content'] == candidate
+def _fake_container(result):
+    container = MagicMock()
+    container.calc_intent = MagicMock(return_value=result)
+    return container
 
 
-def test_handle_read_content_low_confidence_asks_for_confirmation(skill):
-    _wire_common_mocks(skill)
-    candidate = {"skill_id": "prov.a", "content_id": "Ash Girl", "title": "Ash Girl", "confidence": 0.3}
-    skill._search_providers = MagicMock(return_value=[candidate])
-    skill._read_content = MagicMock()
+def test_match_dispatches_read_content(plugin, monkeypatch):
+    _wire_common_mocks(plugin)
+    plugin._intent_containers["en-us"] = _fake_container(
+        {"name": "read_content", "conf": 0.9, "entities": {"title": "cinderella"}})
+    plugin._search_and_read = MagicMock()
 
-    skill.handle_read_content(make_message({"title": "cinderella"}))
+    result = plugin.match(["tell me a story about cinderella"], "en-us", make_message())
 
-    skill.ask_yesno.assert_called_once()
-    skill._read_content.assert_called_once()
-
-
-def test_handle_read_content_confirmation_declined(skill):
-    _wire_common_mocks(skill)
-    skill.ask_yesno = MagicMock(return_value="no")
-    candidate = {"skill_id": "prov.a", "content_id": "Ash Girl", "title": "Ash Girl", "confidence": 0.3}
-    skill._search_providers = MagicMock(return_value=[candidate])
-    skill._read_content = MagicMock()
-
-    skill.handle_read_content(make_message({"title": "cinderella"}))
-
-    skill._read_content.assert_not_called()
+    plugin._search_and_read.assert_called_once_with("cinderella")
+    assert result is not None
+    assert result.skill_id == plugin.skill_id
 
 
-def test_handle_read_content_no_providers_installed(skill):
-    _wire_common_mocks(skill)
-    skill._search_providers = MagicMock(return_value=[])
-    skill._read_content = MagicMock()
+def test_match_dispatches_read_by_collection(plugin):
+    _wire_common_mocks(plugin)
+    plugin._intent_containers["en-us"] = _fake_container(
+        {"name": "read_by_collection", "conf": 0.9, "entities": {"title": None, "collection": "grimm"}})
+    plugin._search_and_read = MagicMock()
 
-    skill.handle_read_content(make_message({"title": "cinderella"}))
+    plugin.match(["tell me a story from grimm"], "en-us", make_message())
 
-    skill._read_content.assert_not_called()
-    dialog_names = [c.args[0] for c in skill.speak_dialog.call_args_list]
-    assert 'no_content_providers' in dialog_names
-
-
-def test_handle_read_by_collection_passes_hint_and_title(skill):
-    _wire_common_mocks(skill)
-    candidate = {"skill_id": "prov.a", "content_id": "Cinderella", "title": "Cinderella",
-                 "author": "Grimm", "confidence": 0.95}
-    skill._search_providers = MagicMock(return_value=[candidate])
-    skill._read_content = MagicMock()
-
-    skill.handle_read_by_collection(make_message({"title": "cinderella", "collection": "grimm"}))
-
-    called_args = skill._search_providers.call_args
-    assert called_args.kwargs["collection_hint"] == "grimm"
-    skill._read_content.assert_called_once()
+    plugin._search_and_read.assert_called_once_with(None, collection_hint="grimm")
 
 
-def test_handle_read_by_collection_without_title_asks_for_a_surprise(skill):
-    _wire_common_mocks(skill)
-    candidate = {"skill_id": "prov.a", "content_id": "Ash Girl", "title": "Ash Girl", "confidence": 1.0}
-    skill._search_providers = MagicMock(return_value=[candidate])
-    skill._read_content = MagicMock()
+def test_match_below_confidence_threshold_returns_none(plugin):
+    plugin._intent_containers["en-us"] = _fake_container(
+        {"name": "read_content", "conf": 0.1, "entities": {"title": "cinderella"}})
+    plugin._search_and_read = MagicMock()
 
-    skill.handle_read_by_collection(make_message({"title": None, "collection": "grimm"}))
+    result = plugin.match(["mumble mumble cinderella"], "en-us", make_message())
 
-    called_args = skill._search_providers.call_args
-    assert called_args.args[0] is None
-    skill._read_content.assert_called_once()
+    assert result is None
+    plugin._search_and_read.assert_not_called()
 
 
-def test_handle_read_by_collection_unknown_collection(skill):
-    _wire_common_mocks(skill)
-    skill._search_providers = MagicMock(return_value=[])
-    skill._read_content = MagicMock()
+def test_match_no_intent_name_returns_none(plugin):
+    plugin._intent_containers["en-us"] = _fake_container({"name": None, "entities": {}})
 
-    skill.handle_read_by_collection(make_message({"title": None, "collection": "nonexistent author"}))
+    result = plugin.match(["what is the weather"], "en-us", make_message())
 
-    skill._read_content.assert_not_called()
-    dialog_names = [c.args[0] for c in skill.speak_dialog.call_args_list]
-    assert 'no_such_collection' in dialog_names
+    assert result is None
 
 
-def test_handle_continue_with_no_active_content(skill):
-    _wire_common_mocks(skill)
-    skill._read_content = MagicMock()
+def test_match_continue_with_nothing_in_progress_declines(plugin):
+    """The key improvement over the old skill-based 'continue.intent':
+    if nothing is actually in progress, match() returns None instead of
+    claiming the utterance and speaking a 'nothing to continue' dialog -
+    letting a later pipeline stage try instead."""
+    plugin._intent_containers["en-us"] = _fake_container(
+        {"name": "continue", "conf": 0.95, "entities": {}})
+    plugin.settings['last_content'] = None
 
-    skill.handle_continue(make_message())
+    result = plugin.match(["continue"], "en-us", make_message())
 
-    skill._read_content.assert_not_called()
-    dialog_names = [c.args[0] for c in skill.speak_dialog.call_args_list]
-    assert 'nothing_to_continue' in dialog_names
+    assert result is None
 
 
-def test_handle_continue_resumes_from_saved_bookmark(skill):
-    _wire_common_mocks(skill)
+def test_match_continue_with_something_in_progress_reads_it(plugin):
+    _wire_common_mocks(plugin)
     candidate = {"skill_id": "prov.a", "content_id": "Cinderella", "title": "Cinderella"}
-    skill.settings['last_content'] = candidate
-    skill.settings['progress'][CommonReading._progress_key(candidate)] = 7
-    skill._read_content = MagicMock()
+    plugin.settings['last_content'] = candidate
+    plugin.settings['progress'][CommonReadingPipeline._progress_key(candidate)] = 7
+    plugin._intent_containers["en-us"] = _fake_container(
+        {"name": "continue", "conf": 0.95, "entities": {}})
+    plugin._read_content = MagicMock()
 
-    skill.handle_continue(make_message())
+    result = plugin.match(["continue"], "en-us", make_message())
 
-    skill._read_content.assert_called_once_with(candidate, 7)
+    plugin._read_content.assert_called_once_with(candidate, 7)
+    assert result is not None
 
 
-def test_stop_while_reading_speaks_and_returns_true(skill):
-    _wire_common_mocks(skill)
-    skill.is_reading = True
+def test_stop_while_reading_speaks_and_returns_true(plugin):
+    _wire_common_mocks(plugin)
+    plugin.is_reading = True
 
-    result = skill.stop()
+    result = plugin.stop()
 
     assert result is True
-    assert skill.is_reading is False
+    assert plugin.is_reading is False
 
 
-def test_stop_while_not_reading_returns_false(skill):
-    _wire_common_mocks(skill)
-    skill.is_reading = False
+def test_stop_while_not_reading_returns_false(plugin):
+    _wire_common_mocks(plugin)
+    plugin.is_reading = False
 
-    assert skill.stop() is False
+    assert plugin.stop() is False

@@ -1,0 +1,4 @@
+padacioso
+ovos-workshop
+ovos-bus-client
+ovos-plugin-manager

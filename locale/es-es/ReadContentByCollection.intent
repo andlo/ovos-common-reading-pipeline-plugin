@@ -1,4 +1,5 @@
-(Cuéntame|Léeme) algo de {collection}
-(Cuéntame|Léeme) {title} de {collection}
-(Cuéntame|Léeme) un cuento de {collection}
+Cuéntame (un cuento|un artículo|una noticia|un documento|un informe) de {collection}
+Léeme (un cuento|un artículo|una noticia|un documento|un informe) de {collection}
+Cuéntame el cuento {title} de {collection}
+Cuéntame un cuento de {collection} sobre {title}
 Busca {title} de {collection}

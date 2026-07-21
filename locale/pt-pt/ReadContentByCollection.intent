@@ -1,4 +1,5 @@
-(Conta|Lê)-me algo de {collection}
-(Conta|Lê)-me {title} de {collection}
-(Conta|Lê)-me uma história de {collection}
+Conta-me (uma história|um artigo|uma notícia|um documento|um relatório) de {collection}
+Lê-me (uma história|um artigo|uma notícia|um documento|um relatório) de {collection}
+Conta-me a história {title} de {collection}
+Conta-me uma história de {collection} sobre {title}
 Encontra {title} de {collection}

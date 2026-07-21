@@ -1,2 +1,6 @@
-(Erzähl|Lies) (mir| ) eine (gute| ) (Geschichte|Erzählung|ein Buch|einen Artikel|ein Gedicht) {title}
-(Erzähl|Lies) (mir| ) (die Geschichte|das Buch|den Artikel|das Gedicht) {title}
+Erzähl mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht) über {title}
+Lies mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht) über {title}
+Erzähl mir die Geschichte {title}
+Erzähl mir den Artikel {title}
+Lies mir die Geschichte {title}
+Erzähl mir von {title}

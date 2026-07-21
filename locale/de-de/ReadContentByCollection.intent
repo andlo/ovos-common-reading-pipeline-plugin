@@ -1,4 +1,6 @@
-(Erzähl|Lies) (mir| ) etwas von {collection}
-(Erzähl|Lies) (mir| ) {title} von {collection}
-(Erzähl|Lies) (mir| ) eine {collection}-Geschichte
+Erzähl mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht) von {collection}
+Lies mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht) von {collection}
+Erzähl mir die Geschichte {title} von {collection}
+Erzähl mir eine {collection}-Geschichte
+Erzähl mir eine {collection}-Geschichte über {title}
 Finde {title} von {collection}

@@ -1,4 +1,6 @@
-(Vertel|Lees) (mij| ) iets van {collection}
-(Vertel|Lees) (mij| ) {title} van {collection}
-(Vertel|Lees) (mij| ) een {collection}-verhaal
+Vertel me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport) van {collection}
+Lees me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport) van {collection}
+Vertel me het verhaal {title} van {collection}
+Vertel me een {collection}-verhaal
+Vertel me een {collection}-verhaal over {title}
 Zoek {title} van {collection}

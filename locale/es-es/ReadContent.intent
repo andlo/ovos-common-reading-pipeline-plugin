@@ -1,2 +1,6 @@
-(Cuéntame|Léeme) un (buen| ) (cuento|libro|artículo|poema) {title}
-(Cuéntame|Léeme) (el cuento|el libro|el artículo|el poema) {title}
+Cuéntame (un cuento|un artículo|una noticia|un documento|un informe) sobre {title}
+Léeme (un cuento|un artículo|una noticia|un documento|un informe) sobre {title}
+Cuéntame el cuento {title}
+Cuéntame el artículo {title}
+Léeme el cuento {title}
+Cuéntame sobre {title}

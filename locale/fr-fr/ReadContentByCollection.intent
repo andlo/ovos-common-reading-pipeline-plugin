@@ -1,4 +1,5 @@
-(Raconte|Lis)-moi quelque chose de {collection}
-(Raconte|Lis)-moi {title} de {collection}
-(Raconte|Lis)-moi une histoire de {collection}
+Raconte-moi (une histoire|un article|une nouvelle|un document|un rapport) de {collection}
+Lis-moi (une histoire|un article|une nouvelle|un document|un rapport) de {collection}
+Raconte-moi l'histoire {title} de {collection}
+Raconte-moi une histoire de {collection} sur {title}
 Trouve {title} de {collection}

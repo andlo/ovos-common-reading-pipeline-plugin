@@ -1,5 +1,5 @@
 """Tests for the pure candidate-selection and description helpers."""
-from conftest import pick_best_candidate, CommonReading
+from conftest import pick_best_candidate, CommonReadingPipeline
 
 
 def test_pick_best_candidate_picks_highest_confidence():
@@ -32,33 +32,33 @@ def test_describe_includes_all_present_fields():
         "collection": "Household Tales",
         "source": "grimmstories.com",
     }
-    assert CommonReading._describe(candidate) == (
+    assert CommonReadingPipeline._describe(candidate) == (
         "Cinderella, by Brothers Grimm, from Household Tales, sourced from grimmstories.com"
     )
 
 
 def test_describe_gracefully_skips_missing_fields():
     candidate = {"title": "Cinderella", "author": "", "source": "grimmstories.com"}
-    assert CommonReading._describe(candidate) == "Cinderella, sourced from grimmstories.com"
+    assert CommonReadingPipeline._describe(candidate) == "Cinderella, sourced from grimmstories.com"
 
 
 def test_describe_title_only():
     candidate = {"title": "Cinderella"}
-    assert CommonReading._describe(candidate) == "Cinderella"
+    assert CommonReadingPipeline._describe(candidate) == "Cinderella"
 
 
 def test_describe_discloses_machine_translation():
     candidate = {"title": "Kedelige installationer", "source": "blog.openvoiceos.org", "machine_translated": True}
-    assert CommonReading._describe(candidate) == (
+    assert CommonReadingPipeline._describe(candidate) == (
         "Kedelige installationer, sourced from blog.openvoiceos.org, machine translated"
     )
 
 
 def test_describe_omits_disclosure_when_not_translated():
     candidate = {"title": "Boring installs", "source": "blog.openvoiceos.org", "machine_translated": False}
-    assert "machine translated" not in CommonReading._describe(candidate)
+    assert "machine translated" not in CommonReadingPipeline._describe(candidate)
 
 
 def test_progress_key_combines_skill_and_content_id():
     candidate = {"skill_id": "ovos-skill-grimm-tales.andlo", "content_id": "Cinderella"}
-    assert CommonReading._progress_key(candidate) == "ovos-skill-grimm-tales.andlo::Cinderella"
+    assert CommonReadingPipeline._progress_key(candidate) == "ovos-skill-grimm-tales.andlo::Cinderella"

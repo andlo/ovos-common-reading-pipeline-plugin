@@ -1,2 +1,7 @@
-(Tell|Read) (me| ) a (good| ) (story|tale|fairy tale|book|article|poem) {title}
-(Tell|Read) (me| ) the (story|book|article|poem) {title}
+Tell me (a story|a tale|an article|a piece of news|a document|a report) about {title}
+Read me (a story|a tale|an article|a piece of news|a document|a report) about {title}
+Tell me the story {title}
+Tell me the article {title}
+Read me the story {title}
+Read me the article {title}
+Tell me about {title}

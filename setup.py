@@ -3,13 +3,14 @@ from setuptools import setup
 from os import walk, path
 
 BASEDIR = path.abspath(path.dirname(__file__))
-URL = "https://github.com/andlo/ovos-skill-common-reading"
-SKILL_CLAZZ = "CommonReading"  # needs to match __init__.py class name
-PYPI_NAME = "ovos-skill-common-reading"  # pip install PYPI_NAME
-
-SKILL_AUTHOR, SKILL_NAME = URL.split(".com/")[-1].split("/")
-SKILL_PKG = SKILL_NAME.lower().replace("-", "_")
-PLUGIN_ENTRY_POINT = f"{SKILL_NAME.lower()}.{SKILL_AUTHOR.lower()}={SKILL_PKG}:{SKILL_CLAZZ}"
+URL = "https://github.com/andlo/ovos-common-reading-pipeline-plugin"
+PLUGIN_CLAZZ = "CommonReadingPipeline"  # needs to match __init__.py class name
+PYPI_NAME = "ovos-common-reading-pipeline-plugin"  # pip install PYPI_NAME
+PLUGIN_PKG = PYPI_NAME.replace("-", "_")
+# pipeline plugins register under the 'opm.pipeline' entry point group,
+# keyed by the plugin's own name (no author suffix) - matches the
+# real-world convention used by e.g. ovos-common-query-pipeline-plugin
+PLUGIN_ENTRY_POINT = f"{PYPI_NAME}={PLUGIN_PKG}:{PLUGIN_CLAZZ}"
 BASE_PATH = path.abspath(path.join(path.dirname(__file__), "."))
 
 
@@ -61,7 +62,7 @@ with open("README.md", "r") as f:
 setup(
     name=PYPI_NAME,
     version=get_version(),
-    description="OVOS skill that orchestrates 'read me something' across content provider skills (fairy tales, books, articles and more), similar in spirit to OCP for media skills",
+    description="OVOS pipeline plugin that orchestrates 'read me something' across content provider skills (fairy tales, articles, news, documents and more), similar in spirit to OCP for media skills",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url=URL,
@@ -80,11 +81,11 @@ setup(
         "Topic :: Multimedia :: Sound/Audio :: Speech",
         "Topic :: Home Automation",
     ],
-    package_dir={SKILL_PKG: "."},
-    package_data={SKILL_PKG: find_resource_files()},
-    packages=[SKILL_PKG],
+    package_dir={PLUGIN_PKG: "."},
+    package_data={PLUGIN_PKG: find_resource_files()},
+    packages=[PLUGIN_PKG],
     include_package_data=True,
     install_requires=get_requirements("requirements.txt"),
-    keywords="ovos skill voice assistant reading storytelling orchestrator",
-    entry_points={"ovos.plugin.skill": PLUGIN_ENTRY_POINT},
+    keywords="ovos pipeline plugin voice assistant reading orchestrator",
+    entry_points={"opm.pipeline": PLUGIN_ENTRY_POINT},
 )

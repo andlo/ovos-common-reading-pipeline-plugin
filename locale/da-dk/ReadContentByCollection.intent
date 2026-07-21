@@ -1,4 +1,7 @@
-(Fortæl|Læs) (mig| ) noget fra {collection}
-(Fortæl|Læs) (mig| ) {title} fra {collection}
-(Fortæl|Læs) (mig| ) en {collection}-historie
+Fortæl mig (en historie|en artikel|en nyhed|et dokument|en rapport) fra {collection}
+Læs mig (en historie|en artikel|en nyhed|et dokument|en rapport) fra {collection}
+Fortæl mig historien {title} fra {collection}
+Fortæl mig en historie af {collection}
+Fortæl mig en {collection}-historie
+Fortæl mig en {collection}-historie om {title}
 Find {title} af {collection}

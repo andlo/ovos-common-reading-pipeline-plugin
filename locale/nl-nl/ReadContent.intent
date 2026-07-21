@@ -1,2 +1,6 @@
-(Vertel|Lees) (mij| ) een (goed| ) (verhaal|boek|artikel|gedicht) {title}
-(Vertel|Lees) (mij| ) (het verhaal|het boek|het artikel|het gedicht) {title}
+Vertel me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport) over {title}
+Lees me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport) over {title}
+Vertel me het verhaal {title}
+Vertel me het artikel {title}
+Lees me het verhaal {title}
+Vertel me over {title}

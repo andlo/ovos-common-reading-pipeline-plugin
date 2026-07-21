@@ -1,2 +1,6 @@
-(Raconte|Lis)-moi une (bonne| ) (histoire|un livre|un article|un poème) {title}
-(Raconte|Lis)-moi (l'histoire|le livre|l'article|le poème) {title}
+Raconte-moi (une histoire|un article|une nouvelle|un document|un rapport) sur {title}
+Lis-moi (une histoire|un article|une nouvelle|un document|un rapport) sur {title}
+Raconte-moi l'histoire {title}
+Raconte-moi l'article {title}
+Lis-moi l'histoire {title}
+Parle-moi de {title}

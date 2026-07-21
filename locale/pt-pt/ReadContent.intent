@@ -1,2 +1,6 @@
-(Conta|Lê)-me (uma boa| ) (história|um livro|um artigo|um poema) {title}
-(Conta|Lê)-me (a história|o livro|o artigo|o poema) {title}
+Conta-me (uma história|um artigo|uma notícia|um documento|um relatório) sobre {title}
+Lê-me (uma história|um artigo|uma notícia|um documento|um relatório) sobre {title}
+Conta-me a história {title}
+Conta-me o artigo {title}
+Lê-me a história {title}
+Fala-me sobre {title}

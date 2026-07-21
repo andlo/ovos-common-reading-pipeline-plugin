@@ -1,5 +1,5 @@
 """
-skill OVOS Common Reading
+OVOS Common Reading - pipeline plugin
 Copyright (C) 2026  Andreas Lorensen
 
 This program is free software: you can redistribute it and/or modify
@@ -17,26 +17,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ---
 
-This skill orchestrates 'read me something' across *provider* skills
-(fairy tale collections, but also potentially books, articles, poems, and
-any other text-based content), the same way OCP (ovos-common-play)
-orchestrates 'play X' across media skills:
+An OVOS pipeline plugin that orchestrates "read me something" across
+*provider* skills - broadcasting a search, picking the best answer, and
+reading it aloud with bookmark/"continue" support, all from one
+dedicated stage in ovos-core's intent pipeline.
 
-- Provider skills own no intents and do no narration - they just answer
-  search/fetch bus requests with content metadata and text.
-- This skill owns all the user-facing conversation: intents, the "is it
-  that one?" disambiguation, narration pacing, and - importantly -
-  bookmark/'continue' state, which is tracked in ONE place regardless of
-  which provider last supplied the content.
+Provider skills implement the ovos.common_reading.* bus protocol - see
+README.md for the full spec.
 
-See README.md for the full ovos.common_reading.* bus protocol.
+Utterance matching uses padacioso (pure Python, no native dependencies),
+trained at runtime from the *.intent files bundled per language in
+locale/<lang>/.
 """
 
+
+import os
+from os.path import dirname
+from typing import Dict, List, Optional, Union
+
+from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message
-from ovos_workshop.decorators import intent_handler
-from ovos_workshop.skills import OVOSSkill
-from ovos_utils import classproperty
-from ovos_utils.process_utils import RuntimeRequirements
+from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
+from ovos_utils.fakebus import FakeBus
+from ovos_workshop.app import OVOSAbstractApplication
+from padacioso import IntentContainer
 
 import time
 
@@ -48,7 +52,7 @@ class ContentFetchError(Exception):
 
 # ovos.common_reading.* bus protocol - shared by convention (no package
 # dependency) with provider skills, the same way OCP's ovos.common_play.*
-# messages work.
+# messages work. Unchanged from the skill-based version.
 COMMON_READING_SEARCH = "ovos.common_reading.search"
 COMMON_READING_SEARCH_RESPONSE = "ovos.common_reading.search.response"
 COMMON_READING_FETCH_CONTENT = "ovos.common_reading.fetch_content"  # + ".{provider_skill_id}"
@@ -56,7 +60,15 @@ COMMON_READING_FETCH_CONTENT_RESPONSE = "ovos.common_reading.fetch_content.respo
 
 SEARCH_TIMEOUT = 2.0  # seconds to wait for provider skills to answer a search
 FETCH_TIMEOUT = 10.0  # seconds to wait for the winning provider to deliver text
-CONFIDENCE_THRESHOLD = 0.8
+CONFIDENCE_THRESHOLD = 0.8  # provider search-response confidence needed to skip "is it that one?"
+MATCH_CONFIDENCE_THRESHOLD = 0.5  # padacioso utterance-match confidence needed to engage at all
+
+# maps our internal intent names -> the *.intent file each is trained from
+INTENT_FILES = {
+    "read_content": "ReadContent.intent",
+    "read_by_collection": "ReadContentByCollection.intent",
+    "continue": "continue.intent",
+}
 
 
 def pick_best_candidate(candidates):
@@ -69,62 +81,68 @@ def pick_best_candidate(candidates):
     return max(candidates, key=lambda c: c.get("confidence", 0))
 
 
-class CommonReading(OVOSSkill):
+class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
 
-    @classproperty
-    def runtime_requirements(self):
-        # this skill does no network I/O itself - it only talks to
-        # provider skills over the local messagebus, and delegates any
-        # internet access to them
-        return RuntimeRequirements(
-            internet_before_load=False,
-            network_before_load=False,
-            requires_internet=False,
-            requires_network=False,
-            no_internet_fallback=True,
-            no_network_fallback=True,
-        )
-
-    def initialize(self):
+    def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
+                 config: Optional[Dict] = None):
+        OVOSAbstractApplication.__init__(
+            self, bus=bus, skill_id="ovos-common-reading-pipeline-plugin.andlo",
+            resources_dir=dirname(__file__))
+        PipelinePlugin.__init__(self, bus, config)
         self.is_reading = False
-        # progress is keyed by "{provider_skill_id}::{content_id}" so
-        # content from different providers never collides, mirroring the
-        # per-title progress tracking ovos-skill-fairytales already did,
-        # just now spanning multiple provider skills instead of just one
         self.settings.setdefault('progress', {})
-        self.settings.setdefault('last_content', None)  # candidate dict, see pick_best_candidate
+        self.settings.setdefault('last_content', None)
+        self._intent_containers = {}  # lang -> trained padacioso IntentContainer
 
-    @intent_handler('ReadContent.intent')
-    def handle_read_content(self, message: Message):
-        if message.data.get("title", "") is None:
-            response = self.get_response('ReadContent', num_retries=1)
-            if not response:
-                return
-        else:
-            response = message.data.get("title")
-        self._search_and_read(response)
+    def _locale_dir_for(self, lang):
+        base = os.path.join(dirname(__file__), "locale")
+        candidate = os.path.join(base, lang.lower())
+        if os.path.isdir(candidate):
+            return candidate
+        return os.path.join(base, "en-us")  # every provider/skill in this family falls back to English
 
-    @intent_handler('ReadContentByCollection.intent')
-    def handle_read_by_collection(self, message: Message):
-        """Handles phrasings that name a specific collection/author/
-        publication, e.g. 'read me a story from Grimm' or 'find
-        Cinderella by Andersen'. {title} is optional here - 'a story
-        from Grimm' with no specific title named is a valid 'surprise
-        me' request to that collection."""
-        collection_hint = message.data.get("collection")
-        title = message.data.get("title")
-        self._search_and_read(title, collection_hint=collection_hint)
+    def _get_intent_container(self, lang):
+        if lang in self._intent_containers:
+            return self._intent_containers[lang]
+        container = IntentContainer()
+        lang_dir = self._locale_dir_for(lang)
+        for intent_name, filename in INTENT_FILES.items():
+            path = os.path.join(lang_dir, filename)
+            if not os.path.isfile(path):
+                continue
+            with open(path, encoding="utf-8") as f:
+                samples = [line.strip() for line in f if line.strip()]
+            if samples:
+                container.add_intent(intent_name, samples)
+        self._intent_containers[lang] = container
+        return container
 
-    @intent_handler('continue.intent')
-    def handle_continue(self, message: Message):
-        last = self.settings.get('last_content')
-        if not last:
-            self.speak_dialog('nothing_to_continue')
-            return
-        self.speak_dialog('continue', data={"title": last["title"]}, wait=True)
-        key = self._progress_key(last)
-        bookmark = self.settings.get('progress', {}).get(key, 0)
-        self._read_content(last, bookmark)
+    def match(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
+        container = self._get_intent_container(lang)
+        for utterance in utterances:
+            result = container.calc_intent(utterance)
+            name = result.get("name")
+            if not name or result.get("conf", 0) < MATCH_CONFIDENCE_THRESHOLD:
+                continue
+            entities = result.get("entities", {})
+
+            if name == "continue":
+                if not self.settings.get('last_content'):
+                    # nothing in progress here - decline rather than claim
+                    # the utterance, so a later pipeline stage gets a
+                    # chance instead
+                    continue
+                self._handle_continue()
+            elif name == "read_content":
+                self._search_and_read(entities.get("title"))
+            elif name == "read_by_collection":
+                self._search_and_read(entities.get("title"), collection_hint=entities.get("collection"))
+            else:
+                continue
+
+            return IntentHandlerMatch(match_type=f"{self.skill_id}:{name}",
+                                       skill_id=self.skill_id, utterance=utterance)
+        return None
 
     def stop(self):
         if self.is_reading is True:
@@ -132,6 +150,13 @@ class CommonReading(OVOSSkill):
             self.is_reading = False
             return True
         return False
+
+    def _handle_continue(self):
+        last = self.settings.get('last_content')
+        self.speak_dialog('continue', data={"title": last["title"]}, wait=True)
+        key = self._progress_key(last)
+        bookmark = self.settings.get('progress', {}).get(key, 0)
+        self._read_content(last, bookmark)
 
     def _search_and_read(self, phrase, collection_hint=None, content_type=None):
         candidates = self._search_providers(phrase, collection_hint=collection_hint, content_type=content_type)
@@ -177,19 +202,7 @@ class CommonReading(OVOSSkill):
     def _search_providers(self, phrase, collection_hint=None, content_type=None, timeout=SEARCH_TIMEOUT):
         """Broadcast a search to every provider skill and collect all
         responses for a short window (unlike _fetch_content, several
-        providers are expected to answer here, not just one).
-
-        collection_hint (optional) is a raw, unvalidated string like
-        'grimm' or 'h c andersen' - providers match it fuzzily against
-        their own known friendly names and should only respond if it's a
-        match, or if collection_hint is None (in which case everyone
-        competes as usual).
-
-        content_type (optional) is a raw hint like 'story', 'book',
-        'article' or 'poem' - providers that only offer one kind of
-        content may use it to decide whether to respond at all, but
-        should not require it (a provider offering only fairy tales can
-        just ignore this field and always respond)."""
+        providers are expected to answer here, not just one)."""
         responses = []
 
         def collect(message):
