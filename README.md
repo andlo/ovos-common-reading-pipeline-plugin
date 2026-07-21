@@ -1,4 +1,4 @@
-# <img src='story-512.png' card_color='#40DBB0' width='50' height='50' style='vertical-align:bottom'/> Common Reading
+# <img src='book-512.png' card_color='#40DBB0' width='50' height='50' style='vertical-align:bottom'/> Common Reading
 
 An OVOS pipeline plugin that reads things aloud - fairy tales, articles,
 news, documents, reports, and whatever else a *provider* skill wants to
