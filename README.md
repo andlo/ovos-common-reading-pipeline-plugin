@@ -59,6 +59,7 @@ there's nothing to read:
 - [ovos-skill-cosquin-tales](https://github.com/andlo/ovos-skill-cosquin-tales) - Emmanuel Cosquin's Lorraine folk tales (Project Gutenberg, French only, no translation)
 - [ovos-skill-ovosblog](https://github.com/andlo/ovos-skill-ovosblog) - the OpenVoiceOS blog, with machine-translation support
 - [ovos-skill-arxiv-papers](https://github.com/andlo/ovos-skill-arxiv-papers) - arXiv paper abstracts (`content_type: "paper"`)
+- [ovos-skill-365tomorrows-stories](https://github.com/andlo/ovos-skill-365tomorrows-stories) - daily CC-licensed flash sci-fi, with machine-translation support
 
 ## Building your own provider
 
