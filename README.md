@@ -4,6 +4,10 @@ Orchestrates "tell me a story" across storyteller *provider* skills - the
 same way [OCP](https://openvoiceos.github.io/ovos-technical-manual/ocp/)
 (ovos-common-play) orchestrates "play X" across media skills.
 
+_"If you want your children to be intelligent, read them fairy tales. If
+you want them to be more intelligent, read them more fairy tales."_
+— Albert Einstein
+
 > **What this is:** an orchestrator for **narrating text-based stories
 > and fairy tales via TTS** - providers deliver plain text (scraped or
 > sourced from places like andersenstories.com, grimmstories.com, or
@@ -143,6 +147,27 @@ If `collection_hint` doesn't clearly match a provider's own aliases, that
 provider should simply not respond to the search at all (rather than
 responding with a low confidence) - this skill only ever considers
 providers that actually answered.
+
+**Tune your match threshold carefully.** `ovos-skill-andersen-tales`
+initially used `ovos_utils.parse.match_one(hint, aliases) >= 0.6` and
+found a real false positive: "andrew lang" scored 0.63 against
+"andersen" (plain character-overlap similarity on short strings, nothing
+to do with meaning). Exact/near-exact alias matches score 1.0, so a
+threshold around 0.85 is safe without losing legitimate fuzzy matches -
+verify empirically for your own alias list rather than assuming 0.6-ish
+is safe.
+
+## Reusing this pattern elsewhere
+
+Nothing about the `ovos.common_tales.*` protocol mechanics (broadcast
+search + collect responses, targeted fetch + `wait_for_response`,
+confidence-based arbitration) is actually fairy-tale-specific - only the
+intents (`Tales.intent`, `TalesByCollection.intent`, `continue.intent`)
+and the "tell me a story" framing are. If a future need for e.g. poems or
+short science articles ever comes up, the right move is probably a
+sibling orchestrator with its own intents/phrasing, reusing this same
+protocol shape rather than overloading this skill's intents with
+unrelated content types.
 
 ## Category
 **Entertainment**
