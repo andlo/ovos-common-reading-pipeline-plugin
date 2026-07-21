@@ -1,0 +1,135 @@
+# <img src='story-512.png' card_color='#40DBB0' width='50' height='50' style='vertical-align:bottom'/> Common Tales
+
+Orchestrates "tell me a story" across storyteller *provider* skills - the
+same way [OCP](https://openvoiceos.github.io/ovos-technical-manual/ocp/)
+(ovos-common-play) orchestrates "play X" across media skills.
+
+[![Tests](https://github.com/andlo/ovos-skill-common-tales/actions/workflows/test.yml/badge.svg)](https://github.com/andlo/ovos-skill-common-tales/actions/workflows/test.yml)
+[![PyPI version](https://img.shields.io/pypi/v/ovos-skill-common-tales.svg)](https://pypi.org/project/ovos-skill-common-tales/)
+
+## Install
+```bash
+pip install ovos-skill-common-tales
+```
+
+You'll also want at least one *provider* skill installed, otherwise this
+skill has nothing to tell:
+
+- [ovos-skill-andersen-tales](https://github.com/andlo/ovos-skill-andersen-tales)
+- [ovos-skill-grimm-tales](https://github.com/andlo/ovos-skill-grimm-tales)
+- [ovos-skill-andrew-lang-tales](https://github.com/andlo/ovos-skill-andrew-lang-tales)
+
+## Why does this exist?
+
+`ovos-skill-fairytales` and `ovos-skill-worldtales` both register nearly
+identical `Tales.intent`/`continue.intent` patterns. Installed together,
+Padatious has to pick a winner per utterance based on model confidence -
+not on which skill actually *has* the story, or which one has a story in
+progress. A bare "continue" is especially bad: it could easily land on
+whichever skill *doesn't* have anything to continue.
+
+This skill (plus a family of "provider" skills that own no intents of
+their own) fixes that properly:
+
+- **One skill owns the conversation.** Only `ovos-skill-common-tales`
+  registers `Tales.intent`/`continue.intent` - provider skills never
+  compete with each other or with this skill for an utterance.
+- **One skill owns 'continue'.** Bookmark/progress state lives here, in
+  one place, keyed by `{provider_skill_id}::{story_id}` - so "continue"
+  always resumes the right story, regardless of which provider told it.
+- **Consistent announcements.** Before narrating, this skill always
+  announces title, author, collection and source (when a provider
+  supplies them) in one consistent phrasing, instead of each provider
+  skill having its own slightly different wording.
+
+## The `ovos.common_tales.*` bus protocol
+
+Provider skills implement this to be usable by `ovos-skill-common-tales`.
+It's a plain messagebus convention (like `ovos.common_play.*`) - no shared
+package dependency needed.
+
+### 1. Search
+
+This skill broadcasts, on `Tales.intent` or `TalesByCollection.intent`:
+
+```
+ovos.common_tales.search
+{
+  "phrase": "<what the user asked for, or null for 'surprise me'>",
+  "collection_hint": "<raw text like 'grimm' or 'h c andersen', or null>",
+  "requester": "<this skill's id>"
+}
+```
+
+`collection_hint` is set when the user names a specific storyteller/collection
+("tell me a story **from Grimm**", "find Cinderella **by Andersen**"). It's
+raw, unvalidated text - each provider fuzzy-matches it against its own
+known friendly names (see "Friendly names" below) and should only respond
+if it's a match, or if `collection_hint` is null (in which case every
+provider competes as usual). `phrase` can also be null on its own - "tell
+me a story from Grimm" with no specific tale named is a valid request for
+the hinted provider to offer something of its own choosing.
+
+Every provider skill that thinks it can help replies (within ~2s):
+
+```
+ovos.common_tales.search.response
+{
+  "skill_id": "<provider skill id>",
+  "story_id": "<opaque id the provider will recognize later - e.g. its own title>",
+  "title": "<human-readable title>",
+  "author": "<author, optional>",
+  "collection": "<book/collection name, optional>",
+  "source": "<where the text comes from, e.g. 'grimmstories.com'>",
+  "confidence": 0.0-1.0
+}
+```
+
+This skill picks the highest-confidence response (and, if it's below 0.8,
+confirms with the user before continuing - same "is it that one?" flow
+`ovos-skill-fairytales` already had).
+
+### 2. Fetch
+
+Once a story is chosen (or resumed via "continue"), this skill sends a
+*targeted* request to just that provider:
+
+```
+ovos.common_tales.fetch_story.<provider_skill_id>
+{"story_id": "<from the search response>", "requester": "<this skill's id>"}
+```
+
+The provider replies once with the full text, split into paragraphs:
+
+```
+ovos.common_tales.fetch_story.response
+{"paragraphs": ["First paragraph...", "Second paragraph...", ...]}
+```
+
+This skill handles all narration pacing, sentence splitting, and bookmark
+tracking itself - providers just deliver text.
+
+### Friendly names
+
+Each provider skill should keep a small list of names it's willing to
+answer to as `collection_hint` - not just its `skill_id`, but the natural
+things a person might call it: `ovos-skill-grimm-tales` might match
+`"grimm"`, `"the brothers grimm"`, `"grimm brothers"`;
+`ovos-skill-andersen-tales` might match `"andersen"`, `"hans christian
+andersen"`, `"h c andersen"`, `"h.c. andersen"`;
+`ovos-skill-andrew-lang-tales` might match `"andrew lang"`, `"lang"`,
+`"the fairy books"`. Matching should be fuzzy (e.g. via
+`ovos_utils.parse.match_one` against the provider's own alias list) rather
+than exact string equality, since STT transcription is never perfectly
+consistent.
+
+If `collection_hint` doesn't clearly match a provider's own aliases, that
+provider should simply not respond to the search at all (rather than
+responding with a low confidence) - this skill only ever considers
+providers that actually answered.
+
+## Category
+**Entertainment**
+
+## Tags
+#stories #fairytales #orchestrator
