@@ -1,0 +1,21 @@
+{
+  "skill_id": "ovos-skill-common-tales.andlo",
+  "source": "https://github.com/andlo/ovos-skill-common-tales",
+  "package_name": "ovos-skill-common-tales",
+  "pip_spec": "ovos-skill-common-tales",
+  "license": "GPL-3.0-or-later",
+  "author": "andlo",
+  "name": "Verhalenverteller",
+  "description": "Coördineert 'vertel me een verhaal' tussen meerdere verhalenverteller-skills (Andersen, Grimm, Andrew Lang en meer).",
+  "examples": [
+    "vertel me het verhaal van Assepoester",
+    "lees me een verhaal voor",
+    "ga verder met het verhaal"
+  ],
+  "tags": [
+    "entertainment",
+    "verhalen",
+    "orchestrator"
+  ],
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-skill-common-tales/main/story-512.png"
+}
