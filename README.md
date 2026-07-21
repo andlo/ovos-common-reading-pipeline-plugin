@@ -43,6 +43,15 @@ skill has nothing to read:
 - ovos-skill-grimm-tales (planned)
 - ovos-skill-andrew-lang-tales (planned)
 
+## Building your own provider
+
+See [ovos-skill-common-reading-example](https://github.com/andlo/ovos-skill-common-reading-example) -
+a template/example (not meant to be installed for its own content) that
+walks through two real, working patterns (RSS feeds and static-page
+scraping), the bus protocol, caching, and - deliberately left as a
+judgment call for you, not automated - whether to machine-translate your
+content and what a human would actually call your source out loud.
+
 ## Why does this exist?
 
 `ovos-skill-fairytales` and `ovos-skill-worldtales` both register nearly
