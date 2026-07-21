@@ -4,6 +4,22 @@ Orchestrates "tell me a story" across storyteller *provider* skills - the
 same way [OCP](https://openvoiceos.github.io/ovos-technical-manual/ocp/)
 (ovos-common-play) orchestrates "play X" across media skills.
 
+> **What this is:** an orchestrator for **narrating text-based stories
+> and fairy tales via TTS** - providers deliver plain text (scraped or
+> sourced from places like andersenstories.com, grimmstories.com, or
+> Project Gutenberg), and this skill reads it aloud, sentence by
+> sentence, with bookmarking and "continue" support.
+>
+> **What this is *not*:** an audiobook or audio-file player. If you're
+> looking for pre-recorded audiobooks, radio dramas, or narrated
+> readings as *audio files*, that's already well covered by existing
+> **OCP** (ovos-common-play) media skills - e.g. `ovos-skill-librivox`,
+> or JarbasSkills' `skill-golden-audiobooks` / `skill-hppodcraft` /
+> `skill-epic-horror-theatre`. This skill doesn't compete with those; it
+> solves a different problem (arbitrating between multiple *text*
+> storyteller skills that would otherwise fight over the same voice
+> commands - see "Why does this exist?" below).
+
 [![Tests](https://github.com/andlo/ovos-skill-common-tales/actions/workflows/test.yml/badge.svg)](https://github.com/andlo/ovos-skill-common-tales/actions/workflows/test.yml)
 [![PyPI version](https://img.shields.io/pypi/v/ovos-skill-common-tales.svg)](https://pypi.org/project/ovos-skill-common-tales/)
 
