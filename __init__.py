@@ -165,7 +165,19 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
 
     def stop(self):
         if self.is_reading is True:
-            self.speak_dialog('stop_reading')
+            # wait=True is not optional here: without it, speak_dialog()
+            # only enqueues the TTS request and returns immediately.
+            # 'stop' is very likely to also trigger OVOS core's own
+            # global audio-stop handling in the same moment, which
+            # flushes the TTS queue - a just-enqueued, not-yet-started
+            # confirmation gets silently wiped out by that flush. wait=True
+            # blocks until the dialog has actually finished being spoken,
+            # so nothing can race it away. Same reasoning applies to
+            # _handle_pause() below. See the real bug report that led to
+            # this: pause/stop were completely silent in practice despite
+            # calling speak_dialog(), while _handle_continue() (which
+            # already had wait=True) worked fine.
+            self.speak_dialog('stop_reading', wait=True)
             self.is_reading = False
             return True
         return False
@@ -173,15 +185,18 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
     def _handle_pause(self):
         """A dedicated 'pause' intent, matched by this pipeline's own
         padacioso parser rather than relying on OVOS's global stop
-        vocabulary (self.stop(), below) - 'pause' isn't guaranteed to
+        vocabulary (self.stop(), above) - 'pause' isn't guaranteed to
         be a recognized synonym for 'stop' at the core level, so
         without this, saying 'pause' while reading could silently do
         nothing. Functionally identical to stop() (is_reading=False
         breaks the reading loop at the next sentence boundary, and
         progress is already bookmarked), just with a dialog that
-        explicitly invites resuming rather than sounding final."""
+        explicitly invites resuming rather than sounding final.
+
+        wait=True for the same reason as stop() - see the comment
+        there."""
         self.is_reading = False
-        self.speak_dialog('paused')
+        self.speak_dialog('paused', wait=True)
 
     def _handle_continue(self):
         last = self.settings.get('last_content')

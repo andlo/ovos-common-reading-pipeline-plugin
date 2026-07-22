@@ -106,6 +106,11 @@ def test_stop_while_reading_speaks_and_returns_true(plugin):
 
     assert result is True
     assert plugin.is_reading is False
+    # wait=True is required, not optional - see the comment on stop()
+    # in __init__.py. Without it, this confirmation was silently
+    # getting flushed by OVOS core's own global stop handling before
+    # ever reaching the speaker - a real bug found in manual testing.
+    plugin.speak_dialog.assert_called_once_with('stop_reading', wait=True)
 
 
 def test_stop_while_not_reading_returns_false(plugin):
@@ -141,7 +146,8 @@ def test_match_pause_while_reading_stops_and_speaks_paused_dialog(plugin):
     result = plugin.match(["pause"], "en-us", make_message())
 
     assert plugin.is_reading is False
-    plugin.speak_dialog.assert_called_once_with('paused')
+    # wait=True is required, not optional - same reasoning/bug as stop()
+    plugin.speak_dialog.assert_called_once_with('paused', wait=True)
     assert result is not None
 
 
