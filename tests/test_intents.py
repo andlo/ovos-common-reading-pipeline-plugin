@@ -113,3 +113,59 @@ def test_stop_while_not_reading_returns_false(plugin):
     plugin.is_reading = False
 
     assert plugin.stop() is False
+
+
+def test_match_pause_with_nothing_being_read_declines(plugin):
+    """Same decline-rather-than-claim reasoning as 'continue': saying
+    'pause' when nothing is actually being read should not be silently
+    swallowed by this pipeline - let a later stage try instead."""
+    plugin._intent_containers["en-us"] = _fake_container(
+        {"name": "pause", "conf": 0.95, "entities": {}})
+    plugin.is_reading = False
+
+    result = plugin.match(["pause"], "en-us", make_message())
+
+    assert result is None
+
+
+def test_match_pause_while_reading_stops_and_speaks_paused_dialog(plugin):
+    """The actual fix: 'pause' is matched by this pipeline's OWN intent
+    parser, not left to OVOS's global stop vocabulary (which may or may
+    not treat 'pause' as a synonym for 'stop') - so it reliably works
+    regardless of core-level vocabulary."""
+    _wire_common_mocks(plugin)
+    plugin.is_reading = True
+    plugin._intent_containers["en-us"] = _fake_container(
+        {"name": "pause", "conf": 0.95, "entities": {}})
+
+    result = plugin.match(["pause"], "en-us", make_message())
+
+    assert plugin.is_reading is False
+    plugin.speak_dialog.assert_called_once_with('paused')
+    assert result is not None
+
+
+def test_pause_then_continue_resumes_from_the_bookmark(plugin):
+    """The actual end-to-end behavior a user cares about: pause mid-
+    story, then continue, and it picks up where it left off - proving
+    pause and the existing continue/bookmark machinery compose
+    correctly, not just that each works in isolation."""
+    _wire_common_mocks(plugin)
+    candidate = {"skill_id": "prov.a", "content_id": "Cinderella", "title": "Cinderella"}
+    plugin.settings['last_content'] = candidate
+    key = CommonReadingPipeline._progress_key(candidate)
+    plugin.settings['progress'][key] = 3
+    plugin.is_reading = True
+
+    plugin._handle_pause()
+    assert plugin.is_reading is False
+    # bookmark from before the pause is untouched by pausing itself
+    assert plugin.settings['progress'][key] == 3
+
+    plugin._intent_containers["en-us"] = _fake_container(
+        {"name": "continue", "conf": 0.95, "entities": {}})
+    plugin._read_content = MagicMock()
+
+    plugin.match(["continue"], "en-us", make_message())
+
+    plugin._read_content.assert_called_once_with(candidate, 3)

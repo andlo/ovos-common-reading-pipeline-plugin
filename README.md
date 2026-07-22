@@ -146,6 +146,27 @@ ovos.common_reading.fetch_content.response
 Reading pacing, sentence splitting, and bookmark tracking all happen
 here - providers just deliver text.
 
+### Stop, pause, and continue
+
+Reading checks a break condition between every sentence (not just
+between paragraphs), so an interruption takes effect within a sentence
+or so, not at the end of a whole paragraph. Two ways to interrupt:
+
+- **"stop"** - handled via `stop()`, the standard OVOS mechanism
+  triggered by the platform's own global stop command/button. Not
+  specific to this plugin's own vocabulary.
+- **"pause"** - a dedicated intent this plugin matches itself (see
+  `locale/<lang>/pause.intent`), rather than relying on "pause" being
+  recognized as a synonym for "stop" at the OVOS core level, which
+  isn't guaranteed. Functionally identical to stop (same bookmark
+  preservation), just with a dialog that explicitly invites resuming
+  ("say continue when you're ready") instead of sounding final.
+
+Either way, progress is bookmarked automatically - saying **"continue"**
+later picks up from the same paragraph, even after a full restart,
+since the bookmark and the last-read content are both stored in
+persistent skill settings, not just in memory.
+
 ### 3. Ping (only used when a search comes up empty)
 
 If a search returns zero candidates, this plugin needs to say something

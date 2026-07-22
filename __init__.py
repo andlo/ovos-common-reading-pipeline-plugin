@@ -80,6 +80,7 @@ INTENT_FILES = {
     "read_content": "ReadContent.intent",
     "read_by_collection": "ReadContentByCollection.intent",
     "continue": "continue.intent",
+    "pause": "pause.intent",
 }
 
 
@@ -145,6 +146,12 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
                     # chance instead
                     continue
                 self._handle_continue()
+            elif name == "pause":
+                if not self.is_reading:
+                    # nothing being read right now - same decline-rather-
+                    # than-claim reasoning as "continue" above
+                    continue
+                self._handle_pause()
             elif name == "read_content":
                 self._search_and_read(entities.get("title"))
             elif name == "read_by_collection":
@@ -162,6 +169,19 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             self.is_reading = False
             return True
         return False
+
+    def _handle_pause(self):
+        """A dedicated 'pause' intent, matched by this pipeline's own
+        padacioso parser rather than relying on OVOS's global stop
+        vocabulary (self.stop(), below) - 'pause' isn't guaranteed to
+        be a recognized synonym for 'stop' at the core level, so
+        without this, saying 'pause' while reading could silently do
+        nothing. Functionally identical to stop() (is_reading=False
+        breaks the reading loop at the next sentence boundary, and
+        progress is already bookmarked), just with a dialog that
+        explicitly invites resuming rather than sounding final."""
+        self.is_reading = False
+        self.speak_dialog('paused')
 
     def _handle_continue(self):
         last = self.settings.get('last_content')
