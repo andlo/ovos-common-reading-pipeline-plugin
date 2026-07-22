@@ -324,15 +324,34 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             self.speak_dialog('content_unavailable')
             return
 
+        # Flattened to a single sentence list up front, so the bookmark
+        # can track exactly where reading paused - at SENTENCE
+        # granularity, not paragraph granularity. The bug this fixes:
+        # tracking only "which paragraph" meant progress[key] got set
+        # to i+1 the moment paragraph i STARTED, before its sentences
+        # had actually been spoken - so pausing partway through a large
+        # paragraph (e.g. a whole story with no \n\n breaks, coming
+        # back from the provider as a single "paragraph") lost
+        # everything remaining in it on resume: paragraphs[bookmark:]
+        # skipped straight past the one paragraph entirely, the loop
+        # ran zero times, and _read_content immediately spoke the
+        # 'finished_reading' dialog as if the (unheard) rest had been
+        # read.
+        sentences = [s for para in paragraphs for s in para.split('. ')]
+
         key = self._progress_key(candidate)
-        for i, para in enumerate(paragraphs[bookmark:], start=bookmark):
-            self.settings['progress'][key] = i + 1
+        for i, sentence in enumerate(sentences[bookmark:], start=bookmark):
             if self.is_reading is False:
                 break
-            for sentence in para.split('. '):
-                if self.is_reading is False:
-                    break
-                self.speak_dialog(sentence, wait=True)
+            self.speak_dialog(sentence, wait=True)
+            # only marked done AFTER actually speaking it - if pause
+            # flips is_reading while this sentence is mid-speech,
+            # speak_dialog(wait=True) still finishes it before
+            # returning, so the bookmark correctly reflects that this
+            # sentence WAS heard, while the next loop iteration's
+            # is_reading check (above) correctly stops before the one
+            # after it.
+            self.settings['progress'][key] = i + 1
 
         if self.is_reading is True:
             self.is_reading = False
