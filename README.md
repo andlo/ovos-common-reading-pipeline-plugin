@@ -31,42 +31,77 @@ you want them to be more intelligent, read them more fairy tales."_
 pip install ovos-common-reading-pipeline-plugin
 ```
 
-Add it to your pipeline in `mycroft.conf` - **before** `stop_high`, not
-after:
+Add it to your pipeline in `mycroft.conf` **right after your stop
+matcher** (`stop_high`/`ovos-stop-pipeline-plugin-high`) - roughly
+where OCP sits, not before stop. "Stop" should always be the most
+reliable, highest-priority command regardless of what skill is active;
+putting anything ahead of it undermines that guarantee for every skill,
+not just this one. An earlier version of this README recommended
+putting this plugin first - that was wrong, and has been reverted; see
+the note at the end of this section for why.
 
-```json
-{
-  "intents": {
-    "pipeline": [
-      "ovos-common-reading-pipeline-plugin",
-      "stop_high",
-      "converse",
-      "ocp_high",
-      "padatious_high",
-      "adapt_high",
-      "..."
-    ]
-  }
-}
+**Don't copy-paste a whole pipeline block from here or anywhere else** -
+your existing list already has entries specific to your install (the
+exact names/order vary: `stop_high` vs `ovos-stop-pipeline-plugin-high`,
+whether persona/OCP/common-query plugins are present, etc). Find your
+existing `"pipeline"` array and insert one line, right after your stop
+matcher:
+
+```diff
+   "pipeline": [
+     "stop_high",
++    "ovos-common-reading-pipeline-plugin",
+     "converse",
+     "ocp_high",
+     ...
+   ]
 ```
 
-Why first, not in the usual `stop_high`-then-your-plugin order most
-docs recommend: this plugin registers its own dedicated `pause` intent
-(not just relying on `self.stop()`, which core's `stop_high` calls
-generically on every active skill). If `stop_high` runs first and its
-own stop vocabulary happens to treat "pause" as a stop synonym, it
-claims the utterance before this plugin's own `pause.intent` ever gets
-a chance - which defeats the entire reason that intent exists (see
-[#2](https://github.com/andlo/ovos-common-reading-pipeline-plugin/issues/2)'s
-sibling discussion on not relying on core vocabulary). `stop` itself is
-unaffected either way - `stop_high` calling this plugin's own
-`stop()` method is the intended, correct behavior, since that's the
-standard OVOS skill-stop convention.
+(a real, complete example from a live install - yours will look similar
+but isn't guaranteed to match exactly, which is exactly why editing your
+existing list beats copying a block):
 
-Since this plugin correctly declines (returns `None`) for any
-utterance it doesn't recognize or isn't currently relevant to, placing
-it first doesn't block anything else in the pipeline from getting its
-turn afterward.
+```json
+"pipeline": [
+  "ovos-stop-pipeline-plugin-high",
+  "ovos-common-reading-pipeline-plugin",
+  "ovos-converse-pipeline-plugin",
+  "ovos-ocp-pipeline-plugin-high",
+  "ovos-persona-pipeline-plugin-high",
+  "ovos-padatious-pipeline-plugin-high",
+  "ovos-fallback-pipeline-plugin-high",
+  "ovos-adapt-pipeline-plugin-high",
+  "ovos-stop-pipeline-plugin-medium",
+  "ovos-adapt-pipeline-plugin-medium",
+  "ovos-common-query-pipeline-plugin",
+  "ovos-fallback-pipeline-plugin-medium",
+  "ovos-persona-pipeline-plugin-low",
+  "ovos-fallback-pipeline-plugin-low"
+]
+```
+
+This plugin registers its own dedicated `pause`/`continue` intents and
+correctly declines (`None`) for anything it doesn't recognize or isn't
+currently relevant to, so this position - right after stop, ahead of
+everything else - is enough for `pause`/`continue` to reliably reach
+it without needing to jump the stop queue.
+
+### A separate, unresolved issue: "stop" itself may not reach this plugin at all
+
+This is **not** a pipeline-ordering problem, and moving this plugin
+around won't fix it. `stop_high` doesn't broadcast to every active
+skill - it internally picks **one specific skill** to call `.stop()`
+on. On at least one real install (confirmed live via
+[ovos-tui-client](https://github.com/andlo/ovos-tui-client)'s activity
+log), it picked a separate system skill (`ovos-skill-stop`, skill_id
+`stop.openvoiceos` - which by its own description "doesn't do anything
+directly" and exists for hardware/enclosure signaling) instead of
+whichever skill was actually mid-session, so saying "stop" while a
+story was playing did nothing at all - the reading continued right
+through it. If you hit this, check whether `ovos-skill-stop` (or
+similar) is installed and whether it needs to be blacklisted; this
+looks like it may be a core `stop_high` skill-selection behavior worth
+raising upstream rather than something fixable from this plugin's side.
 
 You'll also want at least one *provider* skill installed, otherwise
 there's nothing to read:
