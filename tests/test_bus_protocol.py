@@ -10,6 +10,8 @@ from conftest import (
     COMMON_READING_SEARCH_RESPONSE,
     COMMON_READING_FETCH_CONTENT,
     COMMON_READING_FETCH_CONTENT_RESPONSE,
+    COMMON_READING_PING,
+    COMMON_READING_PONG,
 )
 
 
@@ -85,3 +87,35 @@ def test_fetch_content_empty_paragraphs_raises(plugin):
     plugin.bus.wait_for_response.return_value = FakeMessage({"paragraphs": []})
     with pytest.raises(ContentFetchError):
         plugin._fetch_content({"skill_id": "x", "content_id": "y"})
+
+
+def test_ping_providers_collects_all_pongs(plugin, monkeypatch):
+    captured = {}
+
+    def fake_on(event, handler):
+        captured['event'] = event
+        captured['handler'] = handler
+
+    plugin.bus.on.side_effect = fake_on
+
+    def fake_sleep(_seconds):
+        captured['handler'](FakeMessage({"skill_id": "a", "collection": "Grimm's Fairy Tales"}))
+        captured['handler'](FakeMessage({"skill_id": "b", "collection": "365tomorrows"}))
+
+    monkeypatch.setattr(real_time, "sleep", fake_sleep)
+
+    results = plugin._ping_providers(timeout=0.01)
+
+    assert len(results) == 2
+    assert {r["skill_id"] for r in results} == {"a", "b"}
+    assert captured['event'] == COMMON_READING_PONG
+
+    emitted = plugin.bus.emit.call_args[0][0]
+    assert emitted.msg_type == COMMON_READING_PING
+
+    plugin.bus.remove.assert_called_once_with(COMMON_READING_PONG, captured['handler'])
+
+
+def test_ping_providers_no_pongs_returns_empty_list(plugin, monkeypatch):
+    monkeypatch.setattr(real_time, "sleep", lambda *_: None)
+    assert plugin._ping_providers() == []

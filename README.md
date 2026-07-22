@@ -145,6 +145,53 @@ ovos.common_reading.fetch_content.response
 Reading pacing, sentence splitting, and bookmark tracking all happen
 here - providers just deliver text.
 
+### 3. Ping (only used when a search comes up empty)
+
+If a search returns zero candidates, this plugin needs to say something
+honest - but "I couldn't find that" and "you don't have any reading
+skills installed" are very different situations, and guessing which one
+applies (or worse, silently falling back to some other language, see
+[#2](https://github.com/andlo/ovos-common-reading-pipeline-plugin/issues/2))
+is worse than just asking. So it asks:
+
+```
+ovos.common_reading.ping
+{"requester": "<this plugin's id>"}
+```
+
+Every provider that's loaded and listening should reply, cheaply, with
+no index lookup:
+
+```
+ovos.common_reading.pong
+{"skill_id": "<provider skill id>", "collection": "<same collection name it uses in search responses>"}
+```
+
+This is **only** broadcast on the rare 0-candidates path, never on every
+search - a normal search/fetch round trip never triggers a ping. Based
+on the pongs:
+
+- **Zero pongs** -> "you don't have any reading skills installed" (the
+  most useful thing to tell the user, since it's actionable)
+- **At least one pong, but nothing matched a `collection_hint`** ->
+  "I don't know a source called X"
+- **At least one pong, but no phrase matched at all** -> a generic
+  "I couldn't find anything matching that"
+
+This needs no language-awareness on the plugin's part: a provider that
+refused to load for the device's language (the `SUPPORTED_LANGUAGES`
+gate described below) never registers a ping handler either, so it
+correctly stays silent here too - the same mechanism that keeps it out
+of search results keeps it out of ping results, for free.
+
+**If you're building a provider, implementing this is required, not
+optional** - a provider that never pongs looks, from the pipeline's
+perspective, exactly like a provider that isn't installed at all, which
+produces a misleading "nothing installed" message even when your skill
+is present and just didn't have a match. See
+[ovos-skill-common-reading-example](https://github.com/andlo/ovos-skill-common-reading-example)
+for the reference implementation.
+
 ### Friendly names
 
 Each provider should keep a small list of names it's willing to answer

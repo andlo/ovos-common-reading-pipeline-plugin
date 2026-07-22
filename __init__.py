@@ -57,9 +57,21 @@ COMMON_READING_SEARCH = "ovos.common_reading.search"
 COMMON_READING_SEARCH_RESPONSE = "ovos.common_reading.search.response"
 COMMON_READING_FETCH_CONTENT = "ovos.common_reading.fetch_content"  # + ".{provider_skill_id}"
 COMMON_READING_FETCH_CONTENT_RESPONSE = "ovos.common_reading.fetch_content.response"
+# ping/pong: a lightweight 'is anyone there?' check, only broadcast on
+# the rare 0-candidates path (see #2) - never on every search. Lets the
+# pipeline distinguish 'no reading skills installed at all' from
+# 'skills are installed but nothing matched', without the pipeline ever
+# needing to know or guess about languages: a provider that refused to
+# load for an unsupported device language (the SUPPORTED_LANGUAGES gate
+# in andersen-tales/grimm-tales/andrew-lang-tales/bechstein-tales/
+# cosquin-tales) never registers a pong handler either, so it correctly
+# stays silent here too.
+COMMON_READING_PING = "ovos.common_reading.ping"
+COMMON_READING_PONG = "ovos.common_reading.pong"
 
 SEARCH_TIMEOUT = 2.0  # seconds to wait for provider skills to answer a search
 FETCH_TIMEOUT = 10.0  # seconds to wait for the winning provider to deliver text
+PING_TIMEOUT = 0.3  # seconds - short, since a pong is cheap (no index lookup)
 CONFIDENCE_THRESHOLD = 0.8  # provider search-response confidence needed to skip "is it that one?"
 MATCH_CONFIDENCE_THRESHOLD = 0.5  # padacioso utterance-match confidence needed to engage at all
 
@@ -161,10 +173,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
     def _search_and_read(self, phrase, collection_hint=None, content_type=None):
         candidates = self._search_providers(phrase, collection_hint=collection_hint, content_type=content_type)
         if not candidates:
-            if collection_hint:
-                self.speak_dialog('no_such_collection', data={"collection": collection_hint})
-            else:
-                self.speak_dialog('no_content_providers')
+            self._handle_no_candidates(collection_hint)
             return
 
         best = pick_best_candidate(candidates)
@@ -176,6 +185,19 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
                 return
 
         self._announce_and_read(best, bookmark=0)
+
+    def _handle_no_candidates(self, collection_hint):
+        """No search candidates - distinguish 'nothing is installed' from
+        'something is installed but found nothing' via a lightweight
+        ping/pong (see #2), rather than guessing at a fallback
+        language or just saying the same generic thing either way."""
+        if self._ping_providers():
+            if collection_hint:
+                self.speak_dialog('no_such_collection', data={"collection": collection_hint})
+            else:
+                self.speak_dialog('no_matching_content')
+        else:
+            self.speak_dialog('no_content_providers')
 
     @staticmethod
     def _progress_key(candidate):
@@ -219,6 +241,24 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             time.sleep(timeout)
         finally:
             self.bus.remove(COMMON_READING_SEARCH_RESPONSE, collect)
+        return responses
+
+    def _ping_providers(self, timeout=PING_TIMEOUT):
+        """Broadcast a lightweight 'is anyone there?' and collect pongs.
+        Only called from _handle_no_candidates, on the rare 0-candidates
+        path - never on every search, since a pong round trip would add
+        latency to the common case for no benefit."""
+        responses = []
+
+        def collect(message):
+            responses.append(message.data)
+
+        self.bus.on(COMMON_READING_PONG, collect)
+        try:
+            self.bus.emit(Message(COMMON_READING_PING, {"requester": self.skill_id}))
+            time.sleep(timeout)
+        finally:
+            self.bus.remove(COMMON_READING_PONG, collect)
         return responses
 
     def _fetch_content(self, candidate, timeout=FETCH_TIMEOUT):
