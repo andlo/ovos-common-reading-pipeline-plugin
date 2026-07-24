@@ -36,7 +36,7 @@ from os.path import dirname
 from typing import Dict, List, Optional, Union
 
 from ovos_bus_client.client import MessageBusClient
-from ovos_bus_client.message import Message
+from ovos_bus_client.message import Message, dig_for_message
 from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
 from ovos_utils.fakebus import FakeBus
 from ovos_workshop.app import OVOSAbstractApplication
@@ -107,6 +107,50 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         self.settings.setdefault('progress', {})
         self.settings.setdefault('last_content', None)
         self._intent_containers = {}  # lang -> trained padacioso IntentContainer
+
+    def _activate(self, duration_minutes=5):
+        """Mark this plugin as the currently active thing, so OVOS's
+        global stop mechanism actually knows to call our stop() when
+        the user says 'stop'.
+
+        REAL BUG this fixes, confirmed via a live screenshot: saying
+        'stop' mid-story did nothing - the story kept reading through
+        several more paragraphs, eventually forcing a full ovos-core
+        restart to interrupt it. The reading loop itself
+        (_read_content, below) was never the problem - it correctly
+        checks self.is_reading between every sentence and breaks
+        cleanly. The actual issue: OVOS's stop pipeline determines
+        which skill(s) to call .stop() on by consulting the session's
+        active_skills list, and this plugin was never being added to
+        it, since this plugin (PipelinePlugin + OVOSAbstractApplication,
+        not a full skill loaded via the skill manager) doesn't inherit
+        from ovos_workshop.skills.converse.ConversationalSkill, which
+        is normally what provides activate()/deactivate() - confirmed
+        directly that OVOSAbstractApplication has no such method at
+        all. So the global stop handler had no way to know this plugin
+        was the thing currently speaking, and its stop() was simply
+        never being invoked through the normal path.
+
+        Since inheriting ConversationalSkill isn't an option here (no
+        skill manager loads pipeline plugins the way it loads skills),
+        this replicates exactly what ConversationalSkill.activate()
+        itself does under the hood - emit 'intent.service.skills.
+        activate' with our own skill_id - rather than the method
+        itself, which isn't available on our base classes."""
+        msg = dig_for_message() or Message("")
+        if "skill_id" not in msg.context:
+            msg.context["skill_id"] = self.skill_id
+        self.bus.emit(msg.forward("intent.service.skills.activate",
+                                   data={"skill_id": self.skill_id, "timeout": duration_minutes}))
+
+    def _deactivate(self):
+        """Companion to _activate() above - same reasoning, replicates
+        ConversationalSkill.deactivate()'s own bus message directly."""
+        msg = dig_for_message() or Message("")
+        if "skill_id" not in msg.context:
+            msg.context["skill_id"] = self.skill_id
+        self.bus.emit(msg.forward("intent.service.skills.deactivate",
+                                   data={"skill_id": self.skill_id}))
 
     def _locale_dir_for(self, lang):
         base = os.path.join(dirname(__file__), "locale")
@@ -188,8 +232,16 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             # this: pause/stop were completely silent in practice despite
             # calling speak_dialog(), while _handle_continue() (which
             # already had wait=True) worked fine.
+            #
+            # NOTE: this method only runs at all if OVOS's global stop
+            # pipeline actually calls it - which requires this plugin
+            # to be in the session's active_skills list. See
+            # _activate()'s own docstring for the real bug (confirmed
+            # via a live screenshot) where that wasn't happening at
+            # all, so stop() was never even reached.
             self.speak_dialog('stop_reading', wait=True)
             self.is_reading = False
+            self._deactivate()
             return True
         return False
 
@@ -207,6 +259,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         wait=True for the same reason as stop() - see the comment
         there."""
         self.is_reading = False
+        self._deactivate()
         self.speak_dialog('paused', wait=True)
 
     def _handle_continue(self):
@@ -340,11 +393,17 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
 
     def _read_content(self, candidate, bookmark):
         self.is_reading = True
+        # See _activate()'s own docstring for the real bug this fixes -
+        # without this, OVOS's global stop pipeline has no way to know
+        # this plugin is the thing currently speaking, so saying "stop"
+        # mid-story would do nothing at all.
+        self._activate()
         try:
             paragraphs = self._fetch_content(candidate)
         except ContentFetchError as e:
             self.log.error(f"Could not fetch content: {e}")
             self.is_reading = False
+            self._deactivate()
             self.speak_dialog('content_unavailable')
             return
 
@@ -379,6 +438,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
 
         if self.is_reading is True:
             self.is_reading = False
+            self._deactivate()
             self.settings['progress'].pop(key, None)
             self.settings['last_content'] = None
             self.speak_dialog('finished_reading', data={"source": candidate.get("source") or "the source"})

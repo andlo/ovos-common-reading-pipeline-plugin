@@ -6,7 +6,7 @@ see scripts/build_padacioso_intents.py's docstring) so these tests focus
 on what match() does once it has a result."""
 from unittest.mock import MagicMock
 
-from conftest import CommonReadingPipeline
+from conftest import CommonReadingPipeline, ContentFetchError
 
 
 def make_message(data=None):
@@ -241,3 +241,84 @@ def test_high_confidence_skips_confirmation_entirely(plugin):
 
     plugin.ask_yesno.assert_not_called()
     plugin._announce_and_read.assert_called_once_with(candidate, bookmark=0)
+
+
+# --- _activate()/_deactivate() - the real "stop doesn't interrupt reading" bug fix ---
+#
+# Confirmed via a live screenshot: saying "stop" mid-story did nothing at
+# all, eventually forcing a full ovos-core restart. Root cause: OVOS's
+# global stop pipeline determines which skill(s) to call .stop() on via
+# the session's active_skills list, and this plugin was never being
+# added to it (no ConversationalSkill inheritance, so no activate()/
+# deactivate() at all) - so stop() was never even being invoked through
+# the normal path, regardless of the reading loop's own (correct)
+# is_reading checks.
+
+def test_activate_emits_intent_service_skills_activate(plugin):
+    plugin._activate()
+    plugin.bus.emit.assert_called_once()
+    sent = plugin.bus.emit.call_args[0][0]
+    assert sent.msg_type == "intent.service.skills.activate"
+    assert sent.data["skill_id"] == plugin.skill_id
+
+
+def test_deactivate_emits_intent_service_skills_deactivate(plugin):
+    plugin._deactivate()
+    plugin.bus.emit.assert_called_once()
+    sent = plugin.bus.emit.call_args[0][0]
+    assert sent.msg_type == "intent.service.skills.deactivate"
+    assert sent.data["skill_id"] == plugin.skill_id
+
+
+def test_read_content_activates_before_reading(plugin):
+    """The core fix: without this, OVOS has no way to know this plugin
+    is the thing currently speaking when 'stop' is said."""
+    plugin.speak_dialog = MagicMock()
+    plugin._fetch_content = MagicMock(return_value=["One sentence."])
+    plugin._progress_key = MagicMock(return_value="key")
+
+    plugin._read_content({"title": "Test", "source": "test"}, bookmark=0)
+
+    activate_calls = [c for c in plugin.bus.emit.call_args_list if c[0][0].msg_type == "intent.service.skills.activate"]
+    assert len(activate_calls) == 1
+
+
+def test_read_content_deactivates_when_finished_reading(plugin):
+    plugin.speak_dialog = MagicMock()
+    plugin._fetch_content = MagicMock(return_value=["One sentence."])
+    plugin._progress_key = MagicMock(return_value="key")
+
+    plugin._read_content({"title": "Test", "source": "test"}, bookmark=0)
+
+    deactivate_calls = [c for c in plugin.bus.emit.call_args_list if c[0][0].msg_type == "intent.service.skills.deactivate"]
+    assert len(deactivate_calls) == 1
+
+
+def test_read_content_deactivates_on_fetch_error(plugin):
+    plugin.speak_dialog = MagicMock()
+    plugin._fetch_content = MagicMock(side_effect=ContentFetchError("boom"))
+
+    plugin._read_content({"title": "Test", "source": "test"}, bookmark=0)
+
+    deactivate_calls = [c for c in plugin.bus.emit.call_args_list if c[0][0].msg_type == "intent.service.skills.deactivate"]
+    assert len(deactivate_calls) == 1
+
+
+def test_stop_deactivates(plugin):
+    _wire_common_mocks(plugin)
+    plugin.is_reading = True
+
+    plugin.stop()
+
+    deactivate_calls = [c for c in plugin.bus.emit.call_args_list if c[0][0].msg_type == "intent.service.skills.deactivate"]
+    assert len(deactivate_calls) == 1
+
+
+def test_pause_deactivates(plugin):
+    _wire_common_mocks(plugin)
+    plugin.is_reading = True
+
+    plugin._handle_pause()
+
+    deactivate_calls = [c for c in plugin.bus.emit.call_args_list if c[0][0].msg_type == "intent.service.skills.deactivate"]
+    assert len(deactivate_calls) == 1
