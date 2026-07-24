@@ -18,11 +18,10 @@ import pytest
     ("en-us", "tell the story cinderella", "read_content"),  # "me" is optional
     ("en-us", "tell me a fairytale about the ugly duckling", "read_content"),
     ("en-us", "read me my horoscope", "read_by_type"),
-    ("en-us", "read the horoscope", "read_by_type"),
     ("en-us", "what is my horoscope", "read_by_type"),
     ("en-us", "read me today's horoscope", "read_by_type"),
-    ("en-us", "read the almanac", "read_by_type"),
-    ("en-us", "read the weather report", "read_by_type"),
+    ("en-us", "read me my almanac", "read_by_type"),
+    ("en-us", "tell me today's weather report", "read_by_type"),
     ("en-us", "find cinderella from archive", "read_by_collection"),
     ("da-dk", "fortæl mig en historie om askepot", "read_content"),
     ("da-dk", "fortæl mig en historie fra grimm", "read_by_collection"),
@@ -63,7 +62,7 @@ def test_content_type_entity_captured_for_horoscope(plugin):
     read_by_type wins) - this is what gets forwarded to provider
     skills as a search hint, see __init__.py's match()."""
     container = plugin._get_intent_container("en-us")
-    result = container.calc_intent("read the horoscope")
+    result = container.calc_intent("read me my horoscope")
     assert result.get("entities", {}).get("content_type") == "horoscope"
 
 

@@ -135,45 +135,50 @@ READ_CONTENT = {
               "Lê-me a história {title}"],
 }
 
-# content-type-ONLY requests, no {title} at all - "read me my horoscope",
-# "what is my horoscope", "read the horoscope". en-us/da-dk only (see
-# docstring). Danish specifically avoids a shared "min"/"mit" possessive
-# across the open {content_type} wildcard (grammatical gender - "mit
-# horoskop" but "min historie" would be wrong the other way round) by
-# using "dagens" (today's - gender-invariant) for the wildcard-based
-# lines, and hardcoding a couple of horoscope-specific "mit"/definite
-# forms as their own literal lines too, since Danish grammatical gender
-# makes a fully generic bare "{content_type}" form risky in a way
-# English isn't (see below).
+# content-type-ONLY requests, no {title} at all - "read me my
+# horoscope", "what is my horoscope", "read me today's horoscope".
+# en-us/da-dk only (see module docstring).
 #
-# content_type stays a genuinely open, generic wildcard throughout -
-# deliberately NOT special-cased per content word (no dedicated
-# "horoscope intent", "almanac intent", etc). This pipeline doesn't
-# know or care what content types exist, the same way OCP doesn't
-# distinguish jazz from disco as a "media type" - it just captures
-# whatever word the user said and forwards it as a hint on the search
-# broadcast (see COMMON_READING_SEARCH's "content_type" field),
-# letting PROVIDER skills decide what they support. Confirmed via live
-# testing that "read the horoscope"/"read the almanac"/"read the
-# weather report"/"read the recipe" all cleanly match with the right
-# content_type captured, no collision with anything - the ONLY
-# genuine ambiguity is when someone uses one of THIS pipeline's own
-# read_content vocabulary words (story/tale/article/fairytale) as the
-# content type in a phrase that ALSO has an "about X" tail (e.g. "the
-# story about the little mermaid" could theoretically be read as
-# content_type="story about the little mermaid" instead of
-# title="the little mermaid") - tested and confirmed this resolves
-# correctly to read_content in practice (it has far more matching
-# training lines, so it wins on confidence), and is a narrow,
-# understood trade-off of reusing overloaded words, not a reason to
-# abandon genericity or add per-content-type special cases.
+# content_type stays a genuinely open, generic wildcard - deliberately
+# NOT special-cased per content word (no dedicated "horoscope intent",
+# "almanac intent", etc). This pipeline doesn't know or care what
+# content types exist, the same way OCP doesn't distinguish jazz from
+# disco as a "media type" - it just captures whatever word the user
+# said and forwards it as a hint on the search broadcast (see
+# COMMON_READING_SEARCH's "content_type" field), letting PROVIDER
+# skills decide what they support. Confirmed via live testing this
+# works cleanly for horoscope/almanac/weather report/recipe/etc, no
+# collisions.
+#
+# The bare "Read/Tell me the {content_type}" form (no "my"/"today's"
+# qualifier) was tried and REMOVED - not just "usually resolves the
+# right way", but confirmed via CI running a different Python version
+# (3.12) than local testing (3.11/3.14) to be a genuinely
+# NON-DETERMINISTIC tie against read_content's "the {noun} about
+# {title}" pattern whenever content_type captures one of read_content's
+# OWN vocabulary words (story/tale/article/fairytale) followed by
+# "about X" - local testing resolved it one way, CI resolved the exact
+# same input the OPPOSITE way. A coin-flip across environments is a
+# real bug, not a documentable edge case, so the bare "the X" form is
+# gone entirely. "my {content_type}"/"today's {content_type}" have NO
+# such overlap with read_content's templates (which never contain
+# "my"/"today's" at all) and remain fully safe and generic - "read the
+# horoscope" (bare, no "my") is consequently NOT supported; "read me
+# my horoscope" / "what is my horoscope" / "read me today's horoscope"
+# are.
+#
+# Danish additionally avoids a shared "min"/"mit" possessive across the
+# open {content_type} wildcard (grammatical gender - "mit horoskop" but
+# "min historie" would be wrong the other way round) by using "dagens"
+# (today's - gender-invariant) for the wildcard-based lines, and
+# hardcoding a couple of horoscope-specific "mit"/definite forms as
+# their own literal (non-wildcard) lines instead.
 READ_CONTENT_BY_TYPE = {
     "en-us": [
         "Read me my {content_type}", "Read my {content_type}",
         "Tell me my {content_type}", "Tell my {content_type}",
         "What is my {content_type}",
         "Read me today's {content_type}", "Tell me today's {content_type}",
-        "Read the {content_type}", "Tell me the {content_type}", "Tell the {content_type}",
     ],
     "da-dk": [
         "Læs mig dagens {content_type}", "Fortæl mig dagens {content_type}",
