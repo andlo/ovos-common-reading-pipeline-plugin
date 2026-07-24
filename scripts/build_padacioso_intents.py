@@ -1,14 +1,36 @@
 #!/usr/bin/env python3
-"""Rebuild ReadContent.intent, ReadContentByCollection.intent and
-continue.intent for all languages, avoiding padacioso's unreliable
-'(word| )' empty-alternative syntax (confirmed to silently fail to match
-when the optional word is omitted) - every optional word is instead
-written out as full separate alternative lines. Also adds natural
-'about'/'sobre'/'über' connector-word phrasings that were missing
-entirely from the original patterns (found via live testing), and
-broadens content-type vocabulary beyond just 'story' (story/tale/
-article/news/document/report) - this is a general reading pipeline now,
+"""Rebuild ReadContent.intent, ReadContentByCollection.intent,
+ReadContentByType.intent, and continue.intent for all languages,
+avoiding padacioso's unreliable '(word| )' empty-alternative syntax
+(confirmed to silently fail to match when the optional word is
+omitted) - every optional word (including "me", articles, connectors)
+is instead written out as full separate alternative lines. Also adds
+natural 'about'/'sobre'/'über' connector-word phrasings, and broadens
+content-type vocabulary (story/tale/fairy tale/article/news/document/
+report/horoscope/almanac) - this is a general reading pipeline now,
 not just a storyteller.
+
+Real gaps found via user testing that this addresses:
+- "Tell me about {title}" (a bare catch-all, no content-type word
+  required) collided with other skills' own "tell me about X" phrasing
+  (e.g. a Wikipedia/biography skill) - "tell me about abraham lincoln"
+  could get mis-routed here instead of to a knowledge-lookup skill.
+  Removed entirely; every "Tell" pattern now requires an actual
+  content-type word, which "Read" doesn't need to (see below).
+- "Tell me the story about the little mermaid" didn't match anything -
+  every previous pattern connected the content word directly to
+  {title} with no "about"/connector option for the bare "the X"
+  forms. Added throughout.
+- No way to ask for "my horoscope" or "today's horoscope" without a
+  {title} at all - every previous pattern required one. New
+  ReadContentByType.intent (en-us, da-dk) covers phrasing like "read
+  me my horoscope" / "what is my horoscope" / "read the horoscope",
+  with content_type forwarded to provider skills as a search hint (see
+  __init__.py's ovos.common_reading.search "content_type" field) so
+  e.g. a horoscope-only provider can filter/respond appropriately.
+- "me" isn't always present ("tell the story cinderella" is as valid
+  as "tell me the story cinderella") - both forms are now generated
+  for every pattern, not just the with-"me" one.
 
 Note on grammatical gender: German/Spanish/French/Italian/Portuguese
 decline their indefinite article by noun gender ('eine Geschichte' but
@@ -17,15 +39,30 @@ than factor out a shared article (which would produce wrong pairings),
 each full 'article+noun' combination is written out as its own
 alternation branch. English's 'a'/'an' is handled the same way for the
 same reason - simpler here, but still safest to just enumerate rather
-than assume a single shared article works with every noun."""
+than assume a single shared article works with every noun. Danish
+neuter/common gender ('et eventyr' but 'en historie') is handled the
+same way in ReadContentByType by avoiding a shared possessive
+('min'/'mit') across an open {content_type} wildcard entirely - see
+that section's own comment.
+
+Only en-us and da-dk got the full new-vocabulary treatment (fairy
+tale/horoscope/almanac, ReadContentByType) in this pass - the other 6
+languages only got the two SAFE fixes (removing the collision-prone
+bare "about" line, adding the "story about {title}" connector variant
+using words already validated elsewhere in this same script) since
+getting horoscope/almanac/fairy-tale grammar right in 6 more languages
+without a native speaker to check needs more care than a good-faith
+guess deserves. Tracked as a follow-up, not silently skipped."""
 from pathlib import Path
 
 ROOT = Path("/home/andlo/ovos-common-reading-pipeline-plugin/locale")
 
-# content-noun phrases (with grammatically correct article), per language
+# content-noun phrases (with grammatically correct article), per language.
+# en-us/da-dk expanded with fairy tale/tale/horoscope/almanac; the other
+# 6 keep their original set - see module docstring.
 NOUNS = {
-    "en-us": "(a story|a tale|an article|a piece of news|a document|a report)",
-    "da-dk": "(en historie|en artikel|en nyhed|et dokument|en rapport)",
+    "en-us": "(a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac)",
+    "da-dk": "(en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak)",
     "de-de": "(eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht)",
     "es-es": "(un cuento|un artículo|una noticia|un documento|un informe)",
     "fr-fr": "(une histoire|un article|une nouvelle|un document|un rapport)",
@@ -34,49 +71,166 @@ NOUNS = {
     "pt-pt": "(uma história|um artigo|uma notícia|um documento|um relatório)",
 }
 
+# "the {content}" forms get an "about"-connector variant everywhere (safe
+# regardless of article, since the connector word disambiguates), plus a
+# bare "the {content} {title}" form for the most common words specifically
+# (story/tale/article) - not exhaustively for every word, since "the
+# document {title}"-style bare reference is unusual phrasing for most of
+# the newer, less title-oriented nouns (news/report/horoscope/almanac).
 READ_CONTENT = {
-    # NOTE: deliberately no bare 'Tell me a story {title}' pattern - it's
-    # ambiguous with ReadContentByCollection's 'Tell me a story from
-    # {collection}' (both score equally, tie-break is unpredictable, see
-    # git history for the real failure this caused - 'tell me a story
-    # from grimm' was parsed as a *title* 'from grimm'). Every remaining
-    # pattern has a distinguishing connector word.
-    "en-us": [f"Tell me {NOUNS['en-us']} about {{title}}", f"Read me {NOUNS['en-us']} about {{title}}",
-              "Tell me the story {title}", "Tell me the article {title}",
-              "Read me the story {title}", "Read me the article {title}",
-              "Tell me about {title}"],
-    "da-dk": [f"Fortæl mig {NOUNS['da-dk']} om {{title}}", f"Læs mig {NOUNS['da-dk']} om {{title}}",
-              "Fortæl mig historien {title}", "Fortæl mig artiklen {title}",
-              "Læs mig historien {title}", "Fortæl mig om {title}"],
+    "en-us": [
+        f"Tell me {NOUNS['en-us']} about {{title}}", f"Tell {NOUNS['en-us']} about {{title}}",
+        f"Read me {NOUNS['en-us']} about {{title}}", f"Read {NOUNS['en-us']} about {{title}}",
+        "Tell me the story {title}", "Tell the story {title}",
+        "Tell me the story about {title}", "Tell the story about {title}",
+        "Tell me the tale {title}", "Tell the tale {title}",
+        "Tell me the tale about {title}", "Tell the tale about {title}",
+        "Tell me the article {title}", "Tell the article {title}",
+        "Tell me the article about {title}", "Tell the article about {title}",
+        "Read me the story {title}", "Read the story {title}",
+        "Read me the story about {title}", "Read the story about {title}",
+        "Read me the tale {title}", "Read the tale {title}",
+        "Read me the tale about {title}", "Read the tale about {title}",
+        "Read me the article {title}", "Read the article {title}",
+        "Read me the article about {title}", "Read the article about {title}",
+    ],
+    "da-dk": [
+        f"Fortæl mig {NOUNS['da-dk']} om {{title}}", f"Fortæl {NOUNS['da-dk']} om {{title}}",
+        f"Læs mig {NOUNS['da-dk']} om {{title}}", f"Læs {NOUNS['da-dk']} om {{title}}",
+        "Fortæl mig historien {title}", "Fortæl historien {title}",
+        "Fortæl mig historien om {title}", "Fortæl historien om {title}",
+        "Fortæl mig artiklen {title}", "Fortæl artiklen {title}",
+        "Fortæl mig artiklen om {title}", "Fortæl artiklen om {title}",
+        "Læs mig historien {title}", "Læs historien {title}",
+        "Læs mig historien om {title}", "Læs historien om {title}",
+        "Læs mig artiklen {title}", "Læs artiklen {title}",
+        "Læs mig artiklen om {title}", "Læs artiklen om {title}",
+    ],
+    # de/es/fr/it/nl/pt: only the two safe fixes (drop the collision-prone
+    # bare line, add the "about"-connector variant on the existing
+    # story/article words) - no new vocabulary this pass, see docstring.
     "de-de": [f"Erzähl mir {NOUNS['de-de']} über {{title}}", f"Lies mir {NOUNS['de-de']} über {{title}}",
-              "Erzähl mir die Geschichte {title}", "Erzähl mir den Artikel {title}",
-              "Lies mir die Geschichte {title}", "Erzähl mir von {title}"],
+              "Erzähl mir die Geschichte {title}", "Erzähl mir die Geschichte über {title}",
+              "Erzähl mir den Artikel {title}", "Erzähl mir den Artikel über {title}",
+              "Lies mir die Geschichte {title}"],
     "es-es": [f"Cuéntame {NOUNS['es-es']} sobre {{title}}", f"Léeme {NOUNS['es-es']} sobre {{title}}",
-              "Cuéntame el cuento {title}", "Cuéntame el artículo {title}",
-              "Léeme el cuento {title}", "Cuéntame sobre {title}"],
+              "Cuéntame el cuento {title}", "Cuéntame el cuento sobre {title}",
+              "Cuéntame el artículo {title}", "Cuéntame el artículo sobre {title}",
+              "Léeme el cuento {title}"],
     "fr-fr": [f"Raconte-moi {NOUNS['fr-fr']} sur {{title}}", f"Lis-moi {NOUNS['fr-fr']} sur {{title}}",
-              "Raconte-moi l'histoire {title}", "Raconte-moi l'article {title}",
-              "Lis-moi l'histoire {title}", "Parle-moi de {title}"],
+              "Raconte-moi l'histoire {title}", "Raconte-moi l'histoire sur {title}",
+              "Raconte-moi l'article {title}", "Raconte-moi l'article sur {title}",
+              "Lis-moi l'histoire {title}"],
     "it-it": [f"Raccontami {NOUNS['it-it']} su {{title}}", f"Leggimi {NOUNS['it-it']} su {{title}}",
-              "Raccontami la storia {title}", "Raccontami l'articolo {title}",
-              "Leggimi la storia {title}", "Parlami di {title}"],
+              "Raccontami la storia {title}", "Raccontami la storia su {title}",
+              "Raccontami l'articolo {title}", "Raccontami l'articolo su {title}",
+              "Leggimi la storia {title}"],
     "nl-nl": [f"Vertel me {NOUNS['nl-nl']} over {{title}}", f"Lees me {NOUNS['nl-nl']} over {{title}}",
-              "Vertel me het verhaal {title}", "Vertel me het artikel {title}",
-              "Lees me het verhaal {title}", "Vertel me over {title}"],
+              "Vertel me het verhaal {title}", "Vertel me het verhaal over {title}",
+              "Vertel me het artikel {title}", "Vertel me het artikel over {title}",
+              "Lees me het verhaal {title}"],
     "pt-pt": [f"Conta-me {NOUNS['pt-pt']} sobre {{title}}", f"Lê-me {NOUNS['pt-pt']} sobre {{title}}",
-              "Conta-me a história {title}", "Conta-me o artigo {title}",
-              "Lê-me a história {title}", "Fala-me sobre {title}"],
+              "Conta-me a história {title}", "Conta-me a história sobre {title}",
+              "Conta-me o artigo {title}", "Conta-me o artigo sobre {title}",
+              "Lê-me a história {title}"],
 }
 
+# content-type-ONLY requests, no {title} at all - "read me my horoscope",
+# "what is my horoscope", "read the horoscope". en-us/da-dk only (see
+# docstring). Danish specifically avoids a shared "min"/"mit" possessive
+# across the open {content_type} wildcard (grammatical gender - "mit
+# horoskop" but "min historie" would be wrong the other way round) by
+# using "dagens" (today's - gender-invariant) for the wildcard-based
+# lines, and hardcoding a couple of horoscope-specific "mit"/definite
+# forms as their own literal lines too, since Danish grammatical gender
+# makes a fully generic bare "{content_type}" form risky in a way
+# English isn't (see below).
+#
+# content_type stays a genuinely open, generic wildcard throughout -
+# deliberately NOT special-cased per content word (no dedicated
+# "horoscope intent", "almanac intent", etc). This pipeline doesn't
+# know or care what content types exist, the same way OCP doesn't
+# distinguish jazz from disco as a "media type" - it just captures
+# whatever word the user said and forwards it as a hint on the search
+# broadcast (see COMMON_READING_SEARCH's "content_type" field),
+# letting PROVIDER skills decide what they support. Confirmed via live
+# testing that "read the horoscope"/"read the almanac"/"read the
+# weather report"/"read the recipe" all cleanly match with the right
+# content_type captured, no collision with anything - the ONLY
+# genuine ambiguity is when someone uses one of THIS pipeline's own
+# read_content vocabulary words (story/tale/article/fairytale) as the
+# content type in a phrase that ALSO has an "about X" tail (e.g. "the
+# story about the little mermaid" could theoretically be read as
+# content_type="story about the little mermaid" instead of
+# title="the little mermaid") - tested and confirmed this resolves
+# correctly to read_content in practice (it has far more matching
+# training lines, so it wins on confidence), and is a narrow,
+# understood trade-off of reusing overloaded words, not a reason to
+# abandon genericity or add per-content-type special cases.
+READ_CONTENT_BY_TYPE = {
+    "en-us": [
+        "Read me my {content_type}", "Read my {content_type}",
+        "Tell me my {content_type}", "Tell my {content_type}",
+        "What is my {content_type}",
+        "Read me today's {content_type}", "Tell me today's {content_type}",
+        "Read the {content_type}", "Tell me the {content_type}", "Tell the {content_type}",
+    ],
+    "da-dk": [
+        "Læs mig dagens {content_type}", "Fortæl mig dagens {content_type}",
+        "Hvad er dagens {content_type}",
+        "Læs mit horoskop", "Fortæl mig mit horoskop", "Læs horoskopet",
+        "Hvad siger mit horoskop",
+    ],
+}
+
+# KNOWN LIMITATION (pre-existing, not introduced by the above additions
+# - confirmed via live testing): combining BOTH a title AND a collection
+# in one utterance ("tell me the story about the little mermaid from
+# andersen") is fragile - padacioso ties read_content's plain "the
+# story {title}" pattern against read_by_collection's more specific
+# "the story {title} from {collection}" one, and the LESS specific
+# pattern (read_content, swallowing "from andersen" into the title
+# itself) wins more often than not. The BARE "from {collection}" form
+# without an explicit title works reliably ("tell me a story from
+# grimm", "find {title} from {collection}") - it's specifically the
+# combination of both in one utterance that's unreliable. Tracked as a
+# follow-up issue rather than silently left undocumented; padacioso
+# doesn't appear to consistently prefer the more specific of two tied
+# wildcard patterns, so this may need a structurally different
+# approach, not just word reordering, to actually fix.
 READ_BY_COLLECTION = {
-    "en-us": [f"Tell me {NOUNS['en-us']} from {{collection}}", f"Read me {NOUNS['en-us']} from {{collection}}",
-              "Tell me the story {title} from {collection}", "Read me the story {title} from {collection}",
-              "Tell me a story by {collection}", "Tell me a {collection} story",
-              "Tell me a {collection} story about {title}", "Find {title} by {collection}"],
-    "da-dk": [f"Fortæl mig {NOUNS['da-dk']} fra {{collection}}", f"Læs mig {NOUNS['da-dk']} fra {{collection}}",
-              "Fortæl mig historien {title} fra {collection}", "Fortæl mig en historie af {collection}",
-              "Fortæl mig en {collection}-historie", "Fortæl mig en {collection}-historie om {title}",
-              "Find {title} af {collection}"],
+    "en-us": [
+        f"Tell me {NOUNS['en-us']} from {{collection}}", f"Tell {NOUNS['en-us']} from {{collection}}",
+        f"Read me {NOUNS['en-us']} from {{collection}}", f"Read {NOUNS['en-us']} from {{collection}}",
+        "Tell me the story {title} from {collection}", "Tell the story {title} from {collection}",
+        "Tell me the story about {title} from {collection}", "Tell the story about {title} from {collection}",
+        "Tell me the tale {title} from {collection}", "Tell the tale {title} from {collection}",
+        "Tell me the tale about {title} from {collection}", "Tell the tale about {title} from {collection}",
+        "Tell me the article {title} from {collection}", "Tell the article {title} from {collection}",
+        "Tell me the article about {title} from {collection}", "Tell the article about {title} from {collection}",
+        "Read me the story {title} from {collection}", "Read the story {title} from {collection}",
+        "Read me the story about {title} from {collection}", "Read the story about {title} from {collection}",
+        "Read me the tale {title} from {collection}", "Read the tale {title} from {collection}",
+        "Read me the tale about {title} from {collection}", "Read the tale about {title} from {collection}",
+        "Read me the article {title} from {collection}", "Read the article {title} from {collection}",
+        "Read me the article about {title} from {collection}", "Read the article about {title} from {collection}",
+        "Tell me a story by {collection}", "Tell me a {collection} story",
+        "Tell me a {collection} story about {title}", "Find {title} by {collection}",
+        "Find {title} from {collection}",
+    ],
+    "da-dk": [
+        f"Fortæl mig {NOUNS['da-dk']} fra {{collection}}", f"Fortæl {NOUNS['da-dk']} fra {{collection}}",
+        f"Læs mig {NOUNS['da-dk']} fra {{collection}}", f"Læs {NOUNS['da-dk']} fra {{collection}}",
+        "Fortæl mig historien {title} fra {collection}", "Fortæl historien {title} fra {collection}",
+        "Fortæl mig historien om {title} fra {collection}", "Fortæl historien om {title} fra {collection}",
+        "Fortæl mig artiklen {title} fra {collection}", "Fortæl artiklen {title} fra {collection}",
+        "Fortæl mig artiklen om {title} fra {collection}", "Fortæl artiklen om {title} fra {collection}",
+        "Læs mig historien {title} fra {collection}", "Læs historien {title} fra {collection}",
+        "Læs mig historien om {title} fra {collection}", "Læs historien om {title} fra {collection}",
+        "Fortæl mig en historie af {collection}",
+        "Fortæl mig en {collection}-historie", "Fortæl mig en {collection}-historie om {title}",
+        "Find {title} af {collection}", "Find {title} fra {collection}",
+    ],
     "de-de": [f"Erzähl mir {NOUNS['de-de']} von {{collection}}", f"Lies mir {NOUNS['de-de']} von {{collection}}",
               "Erzähl mir die Geschichte {title} von {collection}", "Erzähl mir eine {collection}-Geschichte",
               "Erzähl mir eine {collection}-Geschichte über {title}", "Finde {title} von {collection}"],
@@ -113,7 +267,9 @@ for lang, lines in READ_CONTENT.items():
     (ROOT / lang / "ReadContent.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
 for lang, lines in READ_BY_COLLECTION.items():
     (ROOT / lang / "ReadContentByCollection.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
+for lang, lines in READ_CONTENT_BY_TYPE.items():
+    (ROOT / lang / "ReadContentByType.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
 for lang, lines in CONTINUE.items():
     (ROOT / lang / "continue.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-print("Rewrote ReadContent.intent, ReadContentByCollection.intent, continue.intent for all 8 languages")
+print("Rewrote ReadContent.intent, ReadContentByCollection.intent, ReadContentByType.intent (en-us/da-dk only), continue.intent")

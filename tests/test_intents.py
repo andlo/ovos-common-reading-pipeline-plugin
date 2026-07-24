@@ -175,3 +175,69 @@ def test_pause_then_continue_resumes_from_the_bookmark(plugin):
     plugin.match(["continue"], "en-us", make_message())
 
     plugin._read_content.assert_called_once_with(candidate, 3)
+
+
+def test_low_confidence_confirmation_speaks_with_wait_before_asking(plugin):
+    """Real bug fixed here: 'that_would_be' MUST be spoken with
+    wait=True before ask_yesno() opens its listening window - without
+    it, the window opens (and can time out) while the confirmation
+    question is still queued/playing, not synced to when the user
+    could actually have heard it and started answering. Reported
+    symptom: saying "yes" immediately after "is it that one?" landed
+    in fallback_unknown instead of being caught here."""
+    _wire_common_mocks(plugin)
+    plugin._search_providers = MagicMock(return_value=[
+        {"skill_id": "prov.a", "content_id": "x", "title": "Cinderella", "confidence": 0.4},
+    ])
+    plugin._announce_and_read = MagicMock()
+    call_order = []
+    plugin.speak_dialog.side_effect = lambda *a, **kw: call_order.append(("speak", a, kw))
+    plugin.ask_yesno.side_effect = lambda *a, **kw: call_order.append(("ask", a, kw)) or "yes"
+
+    plugin._search_and_read("cinderella")
+
+    speak_call = next(c for c in call_order if c[0] == "speak")
+    assert speak_call[1][0] == "that_would_be"
+    assert speak_call[2].get("wait") is True
+    # and it must have happened BEFORE ask_yesno, not just with wait=True
+    assert call_order.index(speak_call) < next(i for i, c in enumerate(call_order) if c[0] == "ask")
+
+
+def test_low_confidence_confirmation_yes_reads_the_candidate(plugin):
+    _wire_common_mocks(plugin)
+    candidate = {"skill_id": "prov.a", "content_id": "x", "title": "Cinderella", "confidence": 0.4}
+    plugin._search_providers = MagicMock(return_value=[candidate])
+    plugin._announce_and_read = MagicMock()
+    plugin.ask_yesno.return_value = "yes"
+
+    plugin._search_and_read("cinderella")
+
+    plugin._announce_and_read.assert_called_once_with(candidate, bookmark=0)
+
+
+def test_low_confidence_confirmation_no_declines_without_reading(plugin):
+    _wire_common_mocks(plugin)
+    plugin._search_providers = MagicMock(return_value=[
+        {"skill_id": "prov.a", "content_id": "x", "title": "Cinderella", "confidence": 0.4},
+    ])
+    plugin._announce_and_read = MagicMock()
+    plugin.ask_yesno.return_value = "no"
+
+    plugin._search_and_read("cinderella")
+
+    plugin._announce_and_read.assert_not_called()
+    assert any(c[0][0] == "no_content" for c in plugin.speak_dialog.call_args_list)
+
+
+def test_high_confidence_skips_confirmation_entirely(plugin):
+    """>= CONFIDENCE_THRESHOLD reads immediately - no 'is it that one?'
+    round trip at all."""
+    _wire_common_mocks(plugin)
+    candidate = {"skill_id": "prov.a", "content_id": "x", "title": "Cinderella", "confidence": 0.95}
+    plugin._search_providers = MagicMock(return_value=[candidate])
+    plugin._announce_and_read = MagicMock()
+
+    plugin._search_and_read("cinderella")
+
+    plugin.ask_yesno.assert_not_called()
+    plugin._announce_and_read.assert_called_once_with(candidate, bookmark=0)

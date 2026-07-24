@@ -1,6 +1,7 @@
 Raconte-moi (une histoire|un article|une nouvelle|un document|un rapport) sur {title}
 Lis-moi (une histoire|un article|une nouvelle|un document|un rapport) sur {title}
 Raconte-moi l'histoire {title}
+Raconte-moi l'histoire sur {title}
 Raconte-moi l'article {title}
+Raconte-moi l'article sur {title}
 Lis-moi l'histoire {title}
-Parle-moi de {title}

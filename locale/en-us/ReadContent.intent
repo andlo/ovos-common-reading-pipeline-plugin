@@ -1,7 +1,28 @@
-Tell me (a story|a tale|an article|a piece of news|a document|a report) about {title}
-Read me (a story|a tale|an article|a piece of news|a document|a report) about {title}
+Tell me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
+Tell (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
+Read me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
+Read (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
 Tell me the story {title}
+Tell the story {title}
+Tell me the story about {title}
+Tell the story about {title}
+Tell me the tale {title}
+Tell the tale {title}
+Tell me the tale about {title}
+Tell the tale about {title}
 Tell me the article {title}
+Tell the article {title}
+Tell me the article about {title}
+Tell the article about {title}
 Read me the story {title}
+Read the story {title}
+Read me the story about {title}
+Read the story about {title}
+Read me the tale {title}
+Read the tale {title}
+Read me the tale about {title}
+Read the tale about {title}
 Read me the article {title}
-Tell me about {title}
+Read the article {title}
+Read me the article about {title}
+Read the article about {title}

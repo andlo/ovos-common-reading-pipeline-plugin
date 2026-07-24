@@ -1,6 +1,7 @@
 Erzähl mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht) über {title}
 Lies mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht) über {title}
 Erzähl mir die Geschichte {title}
+Erzähl mir die Geschichte über {title}
 Erzähl mir den Artikel {title}
+Erzähl mir den Artikel über {title}
 Lies mir die Geschichte {title}
-Erzähl mir von {title}

@@ -1,6 +1,20 @@
-Fortæl mig (en historie|en artikel|en nyhed|et dokument|en rapport) om {title}
-Læs mig (en historie|en artikel|en nyhed|et dokument|en rapport) om {title}
+Fortæl mig (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
+Fortæl (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
+Læs mig (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
+Læs (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
 Fortæl mig historien {title}
+Fortæl historien {title}
+Fortæl mig historien om {title}
+Fortæl historien om {title}
 Fortæl mig artiklen {title}
+Fortæl artiklen {title}
+Fortæl mig artiklen om {title}
+Fortæl artiklen om {title}
 Læs mig historien {title}
-Fortæl mig om {title}
+Læs historien {title}
+Læs mig historien om {title}
+Læs historien om {title}
+Læs mig artiklen {title}
+Læs artiklen {title}
+Læs mig artiklen om {title}
+Læs artiklen om {title}

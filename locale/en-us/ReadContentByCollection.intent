@@ -1,8 +1,33 @@
-Tell me (a story|a tale|an article|a piece of news|a document|a report) from {collection}
-Read me (a story|a tale|an article|a piece of news|a document|a report) from {collection}
+Tell me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) from {collection}
+Tell (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) from {collection}
+Read me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) from {collection}
+Read (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) from {collection}
 Tell me the story {title} from {collection}
+Tell the story {title} from {collection}
+Tell me the story about {title} from {collection}
+Tell the story about {title} from {collection}
+Tell me the tale {title} from {collection}
+Tell the tale {title} from {collection}
+Tell me the tale about {title} from {collection}
+Tell the tale about {title} from {collection}
+Tell me the article {title} from {collection}
+Tell the article {title} from {collection}
+Tell me the article about {title} from {collection}
+Tell the article about {title} from {collection}
 Read me the story {title} from {collection}
+Read the story {title} from {collection}
+Read me the story about {title} from {collection}
+Read the story about {title} from {collection}
+Read me the tale {title} from {collection}
+Read the tale {title} from {collection}
+Read me the tale about {title} from {collection}
+Read the tale about {title} from {collection}
+Read me the article {title} from {collection}
+Read the article {title} from {collection}
+Read me the article about {title} from {collection}
+Read the article about {title} from {collection}
 Tell me a story by {collection}
 Tell me a {collection} story
 Tell me a {collection} story about {title}
 Find {title} by {collection}
+Find {title} from {collection}

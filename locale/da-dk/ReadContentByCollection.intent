@@ -1,7 +1,21 @@
-Fortæl mig (en historie|en artikel|en nyhed|et dokument|en rapport) fra {collection}
-Læs mig (en historie|en artikel|en nyhed|et dokument|en rapport) fra {collection}
+Fortæl mig (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) fra {collection}
+Fortæl (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) fra {collection}
+Læs mig (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) fra {collection}
+Læs (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) fra {collection}
 Fortæl mig historien {title} fra {collection}
+Fortæl historien {title} fra {collection}
+Fortæl mig historien om {title} fra {collection}
+Fortæl historien om {title} fra {collection}
+Fortæl mig artiklen {title} fra {collection}
+Fortæl artiklen {title} fra {collection}
+Fortæl mig artiklen om {title} fra {collection}
+Fortæl artiklen om {title} fra {collection}
+Læs mig historien {title} fra {collection}
+Læs historien {title} fra {collection}
+Læs mig historien om {title} fra {collection}
+Læs historien om {title} fra {collection}
 Fortæl mig en historie af {collection}
 Fortæl mig en {collection}-historie
 Fortæl mig en {collection}-historie om {title}
 Find {title} af {collection}
+Find {title} fra {collection}

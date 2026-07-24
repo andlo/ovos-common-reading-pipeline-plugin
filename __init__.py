@@ -79,6 +79,7 @@ MATCH_CONFIDENCE_THRESHOLD = 0.5  # padacioso utterance-match confidence needed 
 INTENT_FILES = {
     "read_content": "ReadContent.intent",
     "read_by_collection": "ReadContentByCollection.intent",
+    "read_by_type": "ReadContentByType.intent",
     "continue": "continue.intent",
     "pause": "pause.intent",
 }
@@ -156,6 +157,16 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
                 self._search_and_read(entities.get("title"))
             elif name == "read_by_collection":
                 self._search_and_read(entities.get("title"), collection_hint=entities.get("collection"))
+            elif name == "read_by_type":
+                # "read me my horoscope" / "tell me today's horoscope" -
+                # no {title}, just a content_type ("horoscope", "story",
+                # etc) forwarded as a hint on the search broadcast (see
+                # COMMON_READING_SEARCH's "content_type" field) so
+                # provider skills can filter/respond appropriately.
+                # Distinct phrasing ("my"/"today's") deliberately avoids
+                # overlapping with read_content's "the story {title}"
+                # patterns - see ReadContentByType.intent's own comment.
+                self._search_and_read(None, content_type=entities.get("content_type"))
             else:
                 continue
 
@@ -213,7 +224,20 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
 
         best = pick_best_candidate(candidates)
         if best["confidence"] < CONFIDENCE_THRESHOLD:
-            self.speak_dialog('that_would_be', data={"title": best["title"]})
+            # wait=True is not optional here - same reasoning as
+            # stop()/_handle_pause() above, and the exact same bug
+            # shape: without it, speak_dialog() only enqueues the TTS
+            # request and returns immediately, so ask_yesno() right
+            # below opens its listening window before 'that_would_be'
+            # has actually finished being spoken (and possibly before
+            # 'is_it_that' has even started). Real bug report that led
+            # to this: saying "yes" right after hearing "is it that
+            # one?" was landing in fallback_unknown instead of being
+            # caught here - the listening window had already opened
+            # (and could time out) while audio was still queued/
+            # playing, not synced to when the user could actually
+            # have heard the question and started answering.
+            self.speak_dialog('that_would_be', data={"title": best["title"]}, wait=True)
             confirm = self.ask_yesno('is_it_that')
             if not confirm or confirm == 'no':
                 self.speak_dialog('no_content')

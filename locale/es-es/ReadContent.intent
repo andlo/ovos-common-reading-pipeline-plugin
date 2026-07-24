@@ -1,6 +1,7 @@
 Cuéntame (un cuento|un artículo|una noticia|un documento|un informe) sobre {title}
 Léeme (un cuento|un artículo|una noticia|un documento|un informe) sobre {title}
 Cuéntame el cuento {title}
+Cuéntame el cuento sobre {title}
 Cuéntame el artículo {title}
+Cuéntame el artículo sobre {title}
 Léeme el cuento {title}
-Cuéntame sobre {title}

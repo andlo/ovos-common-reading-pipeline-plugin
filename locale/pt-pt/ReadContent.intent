@@ -1,6 +1,7 @@
 Conta-me (uma história|um artigo|uma notícia|um documento|um relatório) sobre {title}
 Lê-me (uma história|um artigo|uma notícia|um documento|um relatório) sobre {title}
 Conta-me a história {title}
+Conta-me a história sobre {title}
 Conta-me o artigo {title}
+Conta-me o artigo sobre {title}
 Lê-me a história {title}
-Fala-me sobre {title}

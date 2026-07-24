@@ -1,6 +1,7 @@
 Raccontami (una storia|un articolo|una notizia|un documento|un rapporto) su {title}
 Leggimi (una storia|un articolo|una notizia|un documento|un rapporto) su {title}
 Raccontami la storia {title}
+Raccontami la storia su {title}
 Raccontami l'articolo {title}
+Raccontami l'articolo su {title}
 Leggimi la storia {title}
-Parlami di {title}
