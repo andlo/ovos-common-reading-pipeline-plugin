@@ -2,5 +2,7 @@ Vertel me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport) v
 Lees me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport) van {collection}
 Vertel me het verhaal {title} van {collection}
 Vertel me een {collection}-verhaal
+Lees me een {collection}-verhaal
 Vertel me een {collection}-verhaal over {title}
+Lees me een {collection}-verhaal over {title}
 Zoek {title} van {collection}

@@ -1,5 +1,8 @@
 Raccontami (una storia|un articolo|una notizia|un documento|un rapporto) di {collection}
 Leggimi (una storia|un articolo|una notizia|un documento|un rapporto) di {collection}
 Raccontami la storia {title} di {collection}
+Raccontami una storia di {collection}
+Leggimi una storia di {collection}
 Raccontami una storia di {collection} su {title}
+Leggimi una storia di {collection} su {title}
 Trova {title} di {collection}

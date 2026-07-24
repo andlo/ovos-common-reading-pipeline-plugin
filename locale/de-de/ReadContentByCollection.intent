@@ -2,5 +2,7 @@ Erzähl mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Ber
 Lies mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht) von {collection}
 Erzähl mir die Geschichte {title} von {collection}
 Erzähl mir eine {collection}-Geschichte
+Lies mir eine {collection}-Geschichte
 Erzähl mir eine {collection}-Geschichte über {title}
+Lies mir eine {collection}-Geschichte über {title}
 Finde {title} von {collection}

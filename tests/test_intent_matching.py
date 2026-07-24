@@ -9,6 +9,17 @@ import pytest
     ("en-us", "tell me a story about cinderella", "read_content"),
     ("en-us", "tell me an article about the weather", "read_content"),
     ("en-us", "tell me a story from grimm", "read_by_collection"),
+    # real gap found via live testing: "Tell me a {collection} story"
+    # existed but its "Read" mirror didn't, across ALL 8 languages -
+    # see scripts/build_padacioso_intents.py's READ_BY_COLLECTION
+    ("en-us", "read me a grimm story", "read_by_collection"),
+    ("da-dk", "læs mig en grimm-historie", "read_by_collection"),
+    ("de-de", "lies mir eine grimm-Geschichte", "read_by_collection"),
+    ("es-es", "léeme un cuento de grimm", "read_by_collection"),
+    ("fr-fr", "lis-moi une histoire de grimm", "read_by_collection"),
+    ("it-it", "leggimi una storia di grimm", "read_by_collection"),
+    ("nl-nl", "lees me een grimm-verhaal", "read_by_collection"),
+    ("pt-pt", "lê-me uma história de grimm", "read_by_collection"),
     ("en-us", "continue", "continue"),
     ("en-us", "pause", "pause"),
     # real gaps found via user testing, now covered - see

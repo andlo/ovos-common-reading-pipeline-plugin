@@ -28,6 +28,9 @@ Read me the article about {title} from {collection}
 Read the article about {title} from {collection}
 Tell me a story by {collection}
 Tell me a {collection} story
+Read me a story by {collection}
+Read me a {collection} story
 Tell me a {collection} story about {title}
+Read me a {collection} story about {title}
 Find {title} by {collection}
 Find {title} from {collection}
