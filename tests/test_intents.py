@@ -378,3 +378,21 @@ def test_pause_deactivates(plugin):
 
     deactivate_calls = [c for c in plugin.bus.emit.call_args_list if c[0][0].msg_type == "intent.service.skills.deactivate"]
     assert len(deactivate_calls) == 1
+
+
+# --- can_stop() - required override, or OVOSSkill.can_stop() raises NotImplementedError ---
+#
+# Confirmed via a live screenshot: once _activate() started correctly
+# registering this plugin as active while reading, OVOS's stop pipeline
+# began actually querying it via can_stop() as part of the normal
+# stop-ack flow - and without this override, that raised
+# NotImplementedError on every single stop/pause.
+
+def test_can_stop_true_while_reading(plugin):
+    plugin.is_reading = True
+    assert plugin.can_stop(make_message()) is True
+
+
+def test_can_stop_false_when_not_reading(plugin):
+    plugin.is_reading = False
+    assert plugin.can_stop(make_message()) is False

@@ -230,6 +230,26 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
                                        skill_id=self.skill_id, utterance=utterance)
         return None
 
+    def can_stop(self, message):
+        """Required override, not optional: OVOSSkill.can_stop() (which
+        this plugin inherits via OVOSAbstractApplication -> OVOSSkill)
+        raises NotImplementedError by default for any class that
+        implements its own stop() method, specifically to force this
+        override rather than let it silently default to "can't stop".
+
+        Real crash confirmed via a live screenshot: once _activate()
+        (above) started correctly registering this plugin as active
+        while reading, OVOS's stop pipeline began actually querying it
+        via _handle_stop_ack() -> can_stop() as part of the normal
+        stop-ack flow every active skill goes through - and since this
+        override didn't exist yet, that raised NotImplementedError
+        every single time, logged as a real (if apparently non-fatal
+        to the overall stop still working) error on every stop/pause.
+
+        Same check stop() itself already makes - True exactly when
+        there's something to actually interrupt."""
+        return self.is_reading
+
     def stop(self):
         if self.is_reading is True:
             # is_reading = False MUST happen BEFORE speak_dialog() below,
