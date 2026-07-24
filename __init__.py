@@ -214,7 +214,19 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             else:
                 continue
 
+            # match_data=entities (not the default None) is not
+            # optional: a real crash found via live testing.
+            # IntentHandlerMatch.match_data defaults to None when not
+            # given explicitly, and ovos-core's own handle_utterance
+            # does `data.update(match.match_data)` on it unconditionally
+            # - None isn't iterable, so that line raised TypeError and
+            # the match was silently discarded, falling through to
+            # common-query/fallback instead. Passing the already-
+            # extracted entities dict here fixes the crash and gives
+            # ovos-core's own logging something real to show instead of
+            # nothing.
             return IntentHandlerMatch(match_type=f"{self.skill_id}:{name}",
+                                       match_data=entities,
                                        skill_id=self.skill_id, utterance=utterance)
         return None
 

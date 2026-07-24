@@ -39,6 +39,29 @@ def test_match_dispatches_read_content(plugin, monkeypatch):
     assert result.skill_id == plugin.skill_id
 
 
+def test_match_data_is_never_none_real_crash_found_via_live_testing(plugin):
+    """IntentHandlerMatch.match_data defaults to None if not given
+    explicitly - ovos-core's own handle_utterance does
+    data.update(match.match_data) on it unconditionally, and None
+    isn't iterable, so a bare IntentHandlerMatch(...) without
+    match_data= crashes ovos-core with a TypeError, silently
+    discarding the match and falling through to common-query/fallback
+    instead. Confirmed via a live screenshot showing exactly this
+    traceback. This test would have caught it - asserts match_data is
+    always a dict (the actual entities), never None, regardless of
+    which branch of match() produced the result."""
+    _wire_common_mocks(plugin)
+    plugin._search_and_read = MagicMock()
+    plugin._intent_containers["en-us"] = _fake_container(
+        {"name": "read_content", "conf": 0.9, "entities": {"title": "cinderella"}})
+
+    result = plugin.match(["tell me a story about cinderella"], "en-us", make_message())
+
+    assert result.match_data is not None
+    assert isinstance(result.match_data, dict)
+    assert result.match_data == {"title": "cinderella"}
+
+
 def test_match_dispatches_read_by_collection(plugin):
     _wire_common_mocks(plugin)
     plugin._intent_containers["en-us"] = _fake_container(
