@@ -337,6 +337,39 @@ def test_stop_deactivates(plugin):
     assert len(deactivate_calls) == 1
 
 
+def test_stop_sets_is_reading_false_before_speaking_the_confirmation():
+    """Real race condition found via live testing: with is_reading set
+    to False AFTER speak_dialog('stop_reading', wait=True) instead of
+    before, there's a window where the reading loop's own thread (
+    blocked in its own wait=True call for whatever sentence is
+    currently playing) wakes up, checks is_reading (still True, since
+    stop()'s own speak_dialog call hasn't returned yet - it's queued
+    behind that same sentence), and queues ONE MORE sentence before
+    stop() gets a chance to flip the flag. Reported symptom: reading
+    continued for one more sentence after saying "stop". This test
+    asserts the ORDER directly via a side_effect that checks
+    is_reading's value at the moment speak_dialog is actually called -
+    it must already be False by then, not still True."""
+    plugin = CommonReadingPipeline.__new__(CommonReadingPipeline)
+    plugin.log = MagicMock()
+    plugin.skill_id = "test"
+    plugin._bus = MagicMock()
+    plugin._settings = {}
+    plugin.is_reading = True
+    plugin.ask_yesno = MagicMock(return_value="yes")
+
+    observed = {}
+
+    def fake_speak_dialog(*a, **kw):
+        observed["is_reading_at_speak_time"] = plugin.is_reading
+
+    plugin.speak_dialog = MagicMock(side_effect=fake_speak_dialog)
+
+    plugin.stop()
+
+    assert observed["is_reading_at_speak_time"] is False
+
+
 def test_pause_deactivates(plugin):
     _wire_common_mocks(plugin)
     plugin.is_reading = True

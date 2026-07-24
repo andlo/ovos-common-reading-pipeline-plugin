@@ -232,16 +232,34 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
 
     def stop(self):
         if self.is_reading is True:
-            # wait=True is not optional here: without it, speak_dialog()
-            # only enqueues the TTS request and returns immediately.
-            # 'stop' is very likely to also trigger OVOS core's own
-            # global audio-stop handling in the same moment, which
-            # flushes the TTS queue - a just-enqueued, not-yet-started
-            # confirmation gets silently wiped out by that flush. wait=True
-            # blocks until the dialog has actually finished being spoken,
-            # so nothing can race it away. Same reasoning applies to
-            # _handle_pause() below. See the real bug report that led to
-            # this: pause/stop were completely silent in practice despite
+            # is_reading = False MUST happen BEFORE speak_dialog() below,
+            # not after - a real, confirmed race condition, found via
+            # live testing: the reading loop (_read_content, on its own
+            # thread, blocked inside speak_dialog(sentence, wait=True)
+            # for whatever sentence is currently playing) and this
+            # method (called from a separate bus-event thread) both
+            # want to enqueue TTS around the same moment. With
+            # is_reading flipped to False AFTER 'stop_reading' was
+            # spoken, there's a window where the reading loop's thread
+            # wakes up (its own current sentence finishes), checks
+            # is_reading (still True, since THIS method's own
+            # speak_dialog call hasn't returned yet - it's queued
+            # behind that same sentence), and queues ONE MORE sentence
+            # before this method gets a chance to set the flag - which
+            # is exactly the "still reads one sentence after 'stop'"
+            # behavior reported. _handle_pause() below already had this
+            # ordering right; stop() didn't match it.
+            #
+            # wait=True on the dialog itself is still not optional:
+            # without it, speak_dialog() only enqueues the TTS request
+            # and returns immediately. 'stop' is very likely to also
+            # trigger OVOS core's own global audio-stop handling in the
+            # same moment, which flushes the TTS queue - a
+            # just-enqueued, not-yet-started confirmation gets silently
+            # wiped out by that flush. wait=True blocks until the
+            # dialog has actually finished being spoken, so nothing can
+            # race it away. See the real bug report that led to this:
+            # pause/stop were completely silent in practice despite
             # calling speak_dialog(), while _handle_continue() (which
             # already had wait=True) worked fine.
             #
@@ -251,9 +269,9 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             # _activate()'s own docstring for the real bug (confirmed
             # via a live screenshot) where that wasn't happening at
             # all, so stop() was never even reached.
-            self.speak_dialog('stop_reading', wait=True)
             self.is_reading = False
             self._deactivate()
+            self.speak_dialog('stop_reading', wait=True)
             return True
         return False
 
