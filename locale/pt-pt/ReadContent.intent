@@ -1,7 +1,9 @@
-Conta-me (uma história|um artigo|uma notícia|um documento|um relatório) sobre {title}
-Lê-me (uma história|um artigo|uma notícia|um documento|um relatório) sobre {title}
+Conta-me (uma história|um artigo|uma notícia|um documento|um relatório|um paper|uma publicação no blog|um blog|um resumo|uma atualização|uma crítica|um guia|um ensaio) sobre {title}
+Lê-me (uma história|um artigo|uma notícia|um documento|um relatório|um paper|uma publicação no blog|um blog|um resumo|uma atualização|uma crítica|um guia|um ensaio) sobre {title}
 Conta-me a história {title}
 Conta-me a história sobre {title}
 Conta-me o artigo {title}
 Conta-me o artigo sobre {title}
 Lê-me a história {title}
+Podes contar-me (uma história|um artigo|uma notícia|um documento|um relatório|um paper|uma publicação no blog|um blog|um resumo|uma atualização|uma crítica|um guia|um ensaio) sobre {title}
+Podes ler-me (uma história|um artigo|uma notícia|um documento|um relatório|um paper|uma publicação no blog|um blog|um resumo|uma atualização|uma crítica|um guia|um ensaio) sobre {title}

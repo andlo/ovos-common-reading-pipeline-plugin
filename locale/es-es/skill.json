@@ -1,0 +1,13 @@
+{
+  "skill_id": "ovos-common-reading-pipeline-plugin.andlo",
+  "source": "https://github.com/andlo/ovos-common-reading-pipeline-plugin",
+  "package_name": "ovos-common-reading-pipeline-plugin",
+  "pip_spec": "ovos-common-reading-pipeline-plugin",
+  "license": "GPL-3.0-or-later",
+  "author": "andlo",
+  "name": "Pipeline de lectura genérica",
+  "description": "Una pipeline de lectura genérica: reconoce solicitudes para leer cuentos, artículos y más en voz alta, y las dirige a la skill instalada que pueda ofrecer ese contenido.",
+  "examples": ["Cuéntame un cuento sobre cenicienta", "Cuéntame un cuento de grimm", "Continúa", "Pausa"],
+  "tags": ["entertainment", "stories", "reading", "pipeline"],
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-common-reading-pipeline-plugin/main/book-512.png"
+}

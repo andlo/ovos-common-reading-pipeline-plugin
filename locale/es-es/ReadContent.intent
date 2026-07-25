@@ -1,7 +1,9 @@
-Cuéntame (un cuento|un artículo|una noticia|un documento|un informe) sobre {title}
-Léeme (un cuento|un artículo|una noticia|un documento|un informe) sobre {title}
+Cuéntame (un cuento|un artículo|una noticia|un documento|un informe|un paper|una entrada de blog|un blog|un resumen|una actualización|una reseña|una guía|un ensayo) sobre {title}
+Léeme (un cuento|un artículo|una noticia|un documento|un informe|un paper|una entrada de blog|un blog|un resumen|una actualización|una reseña|una guía|un ensayo) sobre {title}
 Cuéntame el cuento {title}
 Cuéntame el cuento sobre {title}
 Cuéntame el artículo {title}
 Cuéntame el artículo sobre {title}
 Léeme el cuento {title}
+¿Puedes contarme (un cuento|un artículo|una noticia|un documento|un informe|un paper|una entrada de blog|un blog|un resumen|una actualización|una reseña|una guía|un ensayo) sobre {title}
+¿Puedes leerme (un cuento|un artículo|una noticia|un documento|un informe|un paper|una entrada de blog|un blog|un resumen|una actualización|una reseña|una guía|un ensayo) sobre {title}

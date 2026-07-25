@@ -1,5 +1,5 @@
-Erzähl mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht) von {collection}
-Lies mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht) von {collection}
+Erzähl mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht|ein Paper|einen Blogbeitrag|einen Blog|eine Zusammenfassung|ein Update|eine Rezension|einen Leitfaden|einen Essay) von {collection}
+Lies mir (eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht|ein Paper|einen Blogbeitrag|einen Blog|eine Zusammenfassung|ein Update|eine Rezension|einen Leitfaden|einen Essay) von {collection}
 Erzähl mir die Geschichte {title} von {collection}
 Erzähl mir eine {collection}-Geschichte
 Lies mir eine {collection}-Geschichte

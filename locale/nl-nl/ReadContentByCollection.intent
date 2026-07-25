@@ -1,5 +1,5 @@
-Vertel me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport) van {collection}
-Lees me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport) van {collection}
+Vertel me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport|een paper|een blogpost|een blog|een samenvatting|een update|een recensie|een gids|een essay) van {collection}
+Lees me (een verhaal|een artikel|een nieuwsbericht|een document|een rapport|een paper|een blogpost|een blog|een samenvatting|een update|een recensie|een gids|een essay) van {collection}
 Vertel me het verhaal {title} van {collection}
 Vertel me een {collection}-verhaal
 Lees me een {collection}-verhaal

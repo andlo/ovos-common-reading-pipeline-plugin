@@ -1,7 +1,9 @@
-Raccontami (una storia|un articolo|una notizia|un documento|un rapporto) su {title}
-Leggimi (una storia|un articolo|una notizia|un documento|un rapporto) su {title}
+Raccontami (una storia|un articolo|una notizia|un documento|un rapporto|un paper|un post del blog|un blog|un riassunto|un aggiornamento|una recensione|una guida|un saggio) su {title}
+Leggimi (una storia|un articolo|una notizia|un documento|un rapporto|un paper|un post del blog|un blog|un riassunto|un aggiornamento|una recensione|una guida|un saggio) su {title}
 Raccontami la storia {title}
 Raccontami la storia su {title}
 Raccontami l'articolo {title}
 Raccontami l'articolo su {title}
 Leggimi la storia {title}
+Puoi raccontarmi (una storia|un articolo|una notizia|un documento|un rapporto|un paper|un post del blog|un blog|un riassunto|un aggiornamento|una recensione|una guida|un saggio) su {title}
+Puoi leggermi (una storia|un articolo|una notizia|un documento|un rapporto|un paper|un post del blog|un blog|un riassunto|un aggiornamento|una recensione|una guida|un saggio) su {title}

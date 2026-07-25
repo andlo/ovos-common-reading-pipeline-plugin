@@ -1,0 +1,21 @@
+{
+  "skill_id": "ovos-common-reading-pipeline-plugin.andlo",
+  "source": "https://github.com/andlo/ovos-common-reading-pipeline-plugin",
+  "package_name": "ovos-common-reading-pipeline-plugin",
+  "pip_spec": "ovos-common-reading-pipeline-plugin",
+  "license": "GPL-3.0-or-later",
+  "author": "andlo",
+  "name": "Common Reading Pipeline",
+  "description": "A generic reading pipeline: recognizes requests to read stories, articles, reports, horoscopes and more aloud, and routes them to whichever installed provider skill can supply that content. Not tied to any single content type or source.",
+  "examples": [
+    "Tell me a story about cinderella",
+    "Read me an article about penguins",
+    "Tell me a story from grimm",
+    "Read a andersen story",
+    "Read me a horoscope about leo",
+    "Continue reading",
+    "Pause"
+  ],
+  "tags": ["entertainment", "stories", "articles", "horoscope", "reading", "pipeline"],
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-common-reading-pipeline-plugin/main/book-512.png"
+}

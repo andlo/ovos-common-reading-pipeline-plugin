@@ -1,0 +1,21 @@
+{
+  "skill_id": "ovos-common-reading-pipeline-plugin.andlo",
+  "source": "https://github.com/andlo/ovos-common-reading-pipeline-plugin",
+  "package_name": "ovos-common-reading-pipeline-plugin",
+  "pip_spec": "ovos-common-reading-pipeline-plugin",
+  "license": "GPL-3.0-or-later",
+  "author": "andlo",
+  "name": "Generisk læsepipeline",
+  "description": "En generisk læsepipeline: genkender anmodninger om at få historier, artikler, rapporter, horoskoper og mere læst højt, og videresender dem til det installerede skill, der kan levere indholdet. Ikke bundet til én bestemt indholdstype eller kilde.",
+  "examples": [
+    "Fortæl mig en historie om askepot",
+    "Læs mig en artikel om pingviner",
+    "Fortæl mig en historie fra grimm",
+    "Fortæl mig en grimm-historie",
+    "Læs mig dagens horoskop",
+    "Fortsæt",
+    "Pause"
+  ],
+  "tags": ["entertainment", "stories", "artikler", "horoskop", "læsning", "pipeline"],
+  "icon": "https://raw.githubusercontent.com/andlo/ovos-common-reading-pipeline-plugin/main/book-512.png"
+}

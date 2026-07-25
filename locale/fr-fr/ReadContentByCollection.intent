@@ -1,8 +1,9 @@
-Raconte-moi (une histoire|un article|une nouvelle|un document|un rapport) de {collection}
-Lis-moi (une histoire|un article|une nouvelle|un document|un rapport) de {collection}
+Raconte-moi (une histoire|un article|une nouvelle|un document|un rapport|un papier|un article de blog|un blog|un résumé|une mise à jour|une critique|un guide|un essai) de {collection}
+Lis-moi (une histoire|un article|une nouvelle|un document|un rapport|un papier|un article de blog|un blog|un résumé|une mise à jour|une critique|un guide|un essai) de {collection}
 Raconte-moi l'histoire {title} de {collection}
 Raconte-moi une histoire de {collection}
 Lis-moi une histoire de {collection}
 Raconte-moi une histoire de {collection} sur {title}
 Lis-moi une histoire de {collection} sur {title}
 Trouve {title} de {collection}
+Peux-tu me raconter (une histoire|un article|une nouvelle|un document|un rapport|un papier|un article de blog|un blog|un résumé|une mise à jour|une critique|un guide|un essai) de {collection}
