@@ -340,7 +340,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             # (and could time out) while audio was still queued/
             # playing, not synced to when the user could actually
             # have heard the question and started answering.
-            self.speak_dialog('that_would_be', data={"title": best["title"]}, wait=True)
+            self.speak_dialog('that_would_be', data={"description": self._describe_short(best)}, wait=True)
             confirm = self.ask_yesno('is_it_that')
             if not confirm or confirm == 'no':
                 self.speak_dialog('no_content')
@@ -381,6 +381,23 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             parts.append(f"sourced from {candidate['source']}")
         if candidate.get("machine_translated"):
             parts.append("machine translated")
+        return ", ".join(parts)
+
+    @staticmethod
+    def _describe_short(candidate):
+        """A shorter version of _describe() - title and author only,
+        no collection/source/translation notes - for the low-confidence
+        confirmation dialog ('is this the one you meant?'), which needs
+        just enough to help the person recognize/distinguish the match,
+        not the full announcement _describe() builds for right before
+        actually reading starts. Real request that led to this: 'Yes,
+        it could be "how to boil an egg in 100 ways" by Andreas' reads
+        naturally; the full _describe() output (also tacking on
+        collection/source/translation-flag) would be a mouthful for a
+        quick yes/no check."""
+        parts = [candidate["title"]]
+        if candidate.get("author"):
+            parts.append(f"by {candidate['author']}")
         return ", ".join(parts)
 
     def _search_providers(self, phrase, collection_hint=None, content_type=None, timeout=SEARCH_TIMEOUT):

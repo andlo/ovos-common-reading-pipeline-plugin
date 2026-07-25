@@ -93,6 +93,20 @@ READ_CONTENT = {
         "Read me the tale about {title}", "Read the tale about {title}",
         "Read me the article {title}", "Read the article {title}",
         "Read me the article about {title}", "Read the article about {title}",
+        # "Can you..." question forms added alongside the existing
+        # imperatives, since users naturally phrase requests both
+        # ways - kept gated on the SAME NOUNS list as everything else
+        # here (not made permissive/bare-{title}-only): a genuinely
+        # bare "Read me {title}" was tried and REMOVED after the test
+        # suite caught real regressions - it ties against this same
+        # plugin's OWN read_by_collection ("read me a grimm story")
+        # and read_by_type ("read me my horoscope") patterns, which
+        # are less specific about content-type wording by design, so
+        # a completely open {title} wildcard here doesn't just risk
+        # colliding with OTHER skills, it collides within this same
+        # plugin's own intents too.
+        f"Can you read me {NOUNS['en-us']} about {{title}}", f"Can you read {NOUNS['en-us']} about {{title}}",
+        f"Can you tell me {NOUNS['en-us']} about {{title}}", f"Can you tell {NOUNS['en-us']} about {{title}}",
     ],
     "da-dk": [
         f"Fortæl mig {NOUNS['da-dk']} om {{title}}", f"Fortæl {NOUNS['da-dk']} om {{title}}",
@@ -105,6 +119,10 @@ READ_CONTENT = {
         "Læs mig historien om {title}", "Læs historien om {title}",
         "Læs mig artiklen {title}", "Læs artiklen {title}",
         "Læs mig artiklen om {title}", "Læs artiklen om {title}",
+        # same "can you" additions as en-us above, same reasoning for
+        # NOT adding a bare permissive "Læs mig {title}" too
+        f"Kan du læse mig {NOUNS['da-dk']} om {{title}}", f"Kan du læse {NOUNS['da-dk']} om {{title}}",
+        f"Kan du fortælle mig {NOUNS['da-dk']} om {{title}}", f"Kan du fortælle {NOUNS['da-dk']} om {{title}}",
     ],
     # de/es/fr/it/nl/pt: only the two safe fixes (drop the collision-prone
     # bare line, add the "about"-connector variant on the existing

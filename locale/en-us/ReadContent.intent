@@ -26,3 +26,7 @@ Read me the article {title}
 Read the article {title}
 Read me the article about {title}
 Read the article about {title}
+Can you read me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
+Can you read (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
+Can you tell me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
+Can you tell (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}

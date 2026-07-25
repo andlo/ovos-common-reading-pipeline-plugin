@@ -61,6 +61,19 @@ import pytest
     ("pt-pt", "conta-me uma história sobre cinderela", "read_content"),
     ("pt-pt", "conta-me uma história de grimm", "read_by_collection"),
     ("pt-pt", "pausa", "pause"),
+    # "Can you..." question forms (en-us/da-dk) - real request: users
+    # naturally phrase this as a question too, not just an imperative.
+    # Deliberately still gated on the NOUNS list, same as the plain
+    # imperative forms - a fully open "Can you read me {title}" (no
+    # noun required at all) was tried and reverted, since it collided
+    # with this plugin's OWN read_by_collection/read_by_type patterns
+    # (e.g. "read me a grimm story", "read me my horoscope" both
+    # started tying against a bare, unrestricted {title} wildcard).
+    ("en-us", "can you read me an article about boiling an egg", "read_content"),
+    ("en-us", "can you read a story about cinderella", "read_content"),
+    ("en-us", "can you tell me a story about the little mermaid", "read_content"),
+    ("da-dk", "kan du læse mig en historie om askepot", "read_content"),
+    ("da-dk", "kan du fortælle mig en historie om den lille havfrue", "read_content"),
 ])
 def test_real_bundled_intents_match(plugin, lang, phrase, expected_intent):
     container = plugin._get_intent_container(lang)
