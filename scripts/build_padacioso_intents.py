@@ -61,7 +61,7 @@ ROOT = Path("/home/andlo/ovos-common-reading-pipeline-plugin/locale")
 # en-us/da-dk expanded with fairy tale/tale/horoscope/almanac; the other
 # 6 keep their original set - see module docstring.
 NOUNS = {
-    "en-us": "(a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac)",
+    "en-us": "(a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac|a paper|a post|posts|a blog|a blog post|blog posts|a summary|an update|a review|a guide|an essay)",
     "da-dk": "(en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak)",
     "de-de": "(eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht)",
     "es-es": "(un cuento|un artículo|una noticia|un documento|un informe)",
@@ -71,6 +71,73 @@ NOUNS = {
     "pt-pt": "(uma história|um artigo|uma notícia|um documento|um relatório)",
 }
 
+# Same words as NOUNS, without the leading article - for "the {noun}
+# {title}" (definite reference) and "a {collection} {noun}" (the
+# provider name stands in for the article: "a grimm story", not "a
+# grimm a story"). en-us only for now, see module docstring re: only
+# en-us/da-dk getting full-vocabulary treatment this pass.
+BARE_NOUNS = {
+    "en-us": "(story|tale|fairy tale|fairytale|article|piece of news|document|documents|report|reports|horoscope|almanac|paper|post|posts|blog|blog post|blog posts|summary|update|review|guide|essay)",
+}
+
+# Every recognized way to open a reading-pipeline request, "me"
+# included as a full alternative rather than an empty-optional branch -
+# confirmed directly (see this session's own testing) that padacioso's
+# "(me|)" empty-alternative syntax silently fails to match whenever the
+# empty branch is the one that should apply ("tell a story..." without
+# "me" simply didn't match at all), the same class of bug already
+# documented elsewhere in this file for other optional words. Listing
+# both the with-"me" and without-"me" phrasing as separate, complete
+# alternatives in ONE group avoids ever relying on an empty branch,
+# while still costing only a single generated line per pattern instead
+# of the ~10x line-count blowup a naive full-expansion approach would
+# have needed - confirmed empirically that padacioso handles multiple
+# substantial alternation groups combined in one line just fine.
+#
+# "Give me"/"Play me" deliberately excluded - "play" in particular
+# collides hard with OCP/media playback intents already; "give me" is
+# too generic a catch-all to risk. Modal ("Could you"/"Would you") and
+# politeness ("Please") variants included since they're low-collision
+# ways people naturally ask for something read aloud.
+VERB_ME = {
+    "en-us": ("(Tell me|Tell|Read me|Read|"
+              "Can you tell me|Can you tell|Can you read me|Can you read|"
+              "Could you tell me|Could you tell|Could you read me|Could you read|"
+              "Would you tell me|Would you tell|Would you read me|Would you read|"
+              "Please tell me|Please tell|Please read me|Please read)"),
+}
+
+# "Give me the latest/newest article about X" / "read the latest post
+# from ovosblog" - "latest" doesn't carry any special meaning to the
+# pipeline itself (see the design discussion this came from - this
+# stays a generic reading pipeline, not one that understands "latest"
+# as a concept); it's just recognized vocabulary so the request
+# reaches a provider at all, forwarded as ordinary free text within
+# {title} - whether a provider's own search actually returns its most
+# recent item for a "latest ..." query, vs any matching item, is up to
+# that provider's own implementation, not something this plugin
+# enforces or guarantees.
+#
+# TWO separate qualifier sets, not one shared one - a real collision
+# found via testing: QUALIFIER_CONTENT includes "the latest"/"the
+# newest"/etc, but QUALIFIER_COLLECTION deliberately does NOT include
+# the "the ..." forms. "the latest post from ovosblog" ties against
+# READ_CONTENT's own bare "the {title}" line (both start with "the "
+# followed by open text) - the SAME "padacioso doesn't reliably prefer
+# the more specific of two tied patterns" class of issue already
+# documented elsewhere in this file, confirmed again directly rather
+# than assumed. Dropping "the" from the collection-side qualifier
+# means "read the latest post from ovosblog" only matches read_content
+# (imperfect, but no ambiguity), while "read latest post from
+# ovosblog" (no "the") unambiguously reaches read_by_collection - a
+# real, but far less common, phrasing loss traded for reliability.
+QUALIFIER_CONTENT = {
+    "en-us": "(latest|the latest|newest|the newest|most recent|the most recent)",
+}
+QUALIFIER_COLLECTION = {
+    "en-us": "(latest|newest|most recent)",
+}
+
 # "the {content}" forms get an "about"-connector variant everywhere (safe
 # regardless of article, since the connector word disambiguates), plus a
 # bare "the {content} {title}" form for the most common words specifically
@@ -78,35 +145,49 @@ NOUNS = {
 # document {title}"-style bare reference is unusual phrasing for most of
 # the newer, less title-oriented nouns (news/report/horoscope/almanac).
 READ_CONTENT = {
+    # Three lines cover the entire combinatorial space discussed and
+    # tested this session (20 verb+me phrasings x 23 nouns x optional
+    # about/regarding connector, all as required-choice alternation
+    # groups folded into single lines - confirmed directly that
+    # padacioso handles this cleanly, avoiding the ~10x line-count
+    # blowup a fully-expanded approach would have needed):
+    #
+    # 1. Indefinite article + noun + REQUIRED about/regarding - "tell
+    #    me a story about cinderella", "could you read an article
+    #    regarding penguins". Connector is NOT optional here (unlike
+    #    line 2) - a real regression found via the test suite: making
+    #    it optional let "a story {anything}" swallow phrases like "a
+    #    story from grimm" as a bare title, tying against
+    #    read_by_collection's own "a NOUN from {collection}" pattern
+    #    for the exact same utterance. The definite ("the") form below
+    #    doesn't have this problem (read_by_collection has no bare
+    #    "the NOUN from {collection}" pattern to tie against), so it
+    #    keeps the optional connector.
+    # 2. Definite article ("the") + noun + optional about/regarding -
+    #    "read the story cinderella", "can you tell the article
+    #    regarding penguins".
+    # 3. Bare "the {title}" - NO noun at all. The one genuinely new,
+    #    higher-risk addition (covers "read the leo horoscope" style
+    #    phrasing) - confirmed via direct, isolated testing before
+    #    being added here that it does NOT collide with
+    #    read_by_collection ("a grimm story") or read_by_type ("my
+    #    horoscope"/"today's horoscope") the way a fully-open,
+    #    article-free "Read me {title}" previously did (that one was
+    #    tried, caught real regressions in the test suite, and was
+    #    reverted - see git history). "the" is a strong enough
+    #    grammatical marker that it doesn't overlap with either of
+    #    those other patterns' own required wording.
     "en-us": [
-        f"Tell me {NOUNS['en-us']} about {{title}}", f"Tell {NOUNS['en-us']} about {{title}}",
-        f"Read me {NOUNS['en-us']} about {{title}}", f"Read {NOUNS['en-us']} about {{title}}",
-        "Tell me the story {title}", "Tell the story {title}",
-        "Tell me the story about {title}", "Tell the story about {title}",
-        "Tell me the tale {title}", "Tell the tale {title}",
-        "Tell me the tale about {title}", "Tell the tale about {title}",
-        "Tell me the article {title}", "Tell the article {title}",
-        "Tell me the article about {title}", "Tell the article about {title}",
-        "Read me the story {title}", "Read the story {title}",
-        "Read me the story about {title}", "Read the story about {title}",
-        "Read me the tale {title}", "Read the tale {title}",
-        "Read me the tale about {title}", "Read the tale about {title}",
-        "Read me the article {title}", "Read the article {title}",
-        "Read me the article about {title}", "Read the article about {title}",
-        # "Can you..." question forms added alongside the existing
-        # imperatives, since users naturally phrase requests both
-        # ways - kept gated on the SAME NOUNS list as everything else
-        # here (not made permissive/bare-{title}-only): a genuinely
-        # bare "Read me {title}" was tried and REMOVED after the test
-        # suite caught real regressions - it ties against this same
-        # plugin's OWN read_by_collection ("read me a grimm story")
-        # and read_by_type ("read me my horoscope") patterns, which
-        # are less specific about content-type wording by design, so
-        # a completely open {title} wildcard here doesn't just risk
-        # colliding with OTHER skills, it collides within this same
-        # plugin's own intents too.
-        f"Can you read me {NOUNS['en-us']} about {{title}}", f"Can you read {NOUNS['en-us']} about {{title}}",
-        f"Can you tell me {NOUNS['en-us']} about {{title}}", f"Can you tell {NOUNS['en-us']} about {{title}}",
+        f"{VERB_ME['en-us']} {NOUNS['en-us']} (about|regarding) {{title}}",
+        f"{VERB_ME['en-us']} the {BARE_NOUNS['en-us']} ({{title}}|about {{title}}|regarding {{title}})",
+        f"{VERB_ME['en-us']} the {{title}}",
+        # "read the latest story about cinderella" - deliberately
+        # title-only, no "from {collection}" variant here (that
+        # combination inherits the pre-existing title+collection
+        # fragility documented in READ_BY_COLLECTION below - tested
+        # directly, confirmed still fragile even with a distinguishing
+        # qualifier word, not something newly introduced by this line).
+        f"{VERB_ME['en-us']} {QUALIFIER_CONTENT['en-us']} {BARE_NOUNS['en-us']} (about|regarding) {{title}}",
     ],
     "da-dk": [
         f"Fortæl mig {NOUNS['da-dk']} om {{title}}", f"Fortæl {NOUNS['da-dk']} om {{title}}",
@@ -192,11 +273,21 @@ READ_CONTENT = {
 # hardcoding a couple of horoscope-specific "mit"/definite forms as
 # their own literal (non-wildcard) lines instead.
 READ_CONTENT_BY_TYPE = {
+    # "What is my {content_type}" deliberately removed - real feedback:
+    # this is a reading pipeline, not a "what" pipeline (Common Query's
+    # domain) - "what is X" phrasing reads like a factual question, not
+    # a reading request, and risks the same kind of collision the bare
+    # "tell me about {title}" form was removed for earlier (see module
+    # docstring). "Tell/Read {me} my/today's {content_type}" already
+    # unambiguously signals "read this to me" via the verb itself, no
+    # need for a "what is" variant.
+    #
+    # "todays" (no apostrophe) added alongside "today's" - real-world
+    # speech-to-text output commonly drops apostrophes entirely, so the
+    # apostrophe-only form was silently unreachable for anyone whose
+    # STT does this.
     "en-us": [
-        "Read me my {content_type}", "Read my {content_type}",
-        "Tell me my {content_type}", "Tell my {content_type}",
-        "What is my {content_type}",
-        "Read me today's {content_type}", "Tell me today's {content_type}",
+        f"{VERB_ME['en-us']} (my|today's|todays) {{content_type}}",
     ],
     "da-dk": [
         "Læs mig dagens {content_type}", "Fortæl mig dagens {content_type}",
@@ -222,26 +313,66 @@ READ_CONTENT_BY_TYPE = {
 # wildcard patterns, so this may need a structurally different
 # approach, not just word reordering, to actually fix.
 READ_BY_COLLECTION = {
+    # Four lines, same combinatorial-alternation approach as
+    # READ_CONTENT above:
+    # 1. Indefinite noun + from/by {collection} - "tell me a story
+    #    from grimm", "could you read a guide by {collection}".
+    # 2. Definite "the {noun} {title}" + from/by {collection} - the
+    #    title+collection combination already documented (see the
+    #    KNOWN LIMITATION note above) as fragile against read_content's
+    #    own plain "the {noun} {title}" pattern - kept as before
+    #    (pre-existing behavior, not made worse or better by this
+    #    pass), not re-litigated here.
+    # 3. "a {collection} {noun}" (no "from"/"by" at all, provider name
+    #    used adjective-style) - generalized to the FULL noun list and
+    #    both with/without "me", fixing a real, confirmed gap: "read a
+    #    andersen story" (no "me") previously had no matching line at
+    #    all, only "read ME a {collection} story" did, and only for
+    #    the single word "story", not the full noun list.
+    # 4. "Find {title} by/from {collection}" - unchanged, already
+    #    working correctly, no reason to touch it.
+    # 5. "latest"/"newest"/"most recent" {noun} from/by {collection} -
+    #    "read latest post from ovosblog", "read newest posts from
+    #    ovosblog". Deliberately does NOT include "the latest"/"the
+    #    newest" here (unlike QUALIFIER_CONTENT, used in READ_CONTENT
+    #    above) - confirmed directly via testing: "the latest post
+    #    from ovosblog" ties against READ_CONTENT's own bare "the
+    #    {title}" line (both start with "the " + open text), and
+    #    padacioso doesn't reliably resolve that tie toward the more
+    #    specific collection match - the SAME class of issue as the
+    #    title+collection fragility below. Dropping "the" from this
+    #    side avoids the tie entirely: "the latest post from ovosblog"
+    #    falls through to read_content instead (imperfect, but
+    #    unambiguous), while "latest post from ovosblog" (no "the")
+    #    reaches read_by_collection cleanly.
+    #
+    #    A combined title+"latest"+collection line ("read the latest
+    #    post about AI from ovosblog") was also tried and NOT kept -
+    #    confirmed via direct testing that it inherits the exact same
+    #    pre-existing title+collection fragility documented in the
+    #    KNOWN LIMITATION note above, just with "latest" layered on
+    #    top rather than being a new problem. Same tradeoff as
+    #    everything else there: collection-only and title-only both
+    #    work reliably, the combination of all three doesn't yet.
+    #
+    #    NOTE - grammar only, not full behavior yet: this pipeline
+    #    doesn't currently forward "latest" as a distinct signal to
+    #    provider skills at all (see __init__.py's search broadcast) -
+    #    a provider receiving this request today can't distinguish it
+    #    from an ordinary collection-only request (no title given), so
+    #    it likely still returns whatever its own no-title fallback
+    #    already returns (e.g. a random pick, not necessarily its most
+    #    recent item) rather than actually honoring "latest"
+    #    specifically. Recognizing the phrase correctly is done; making
+    #    providers actually act on it is a separate, not yet
+    #    implemented follow-up.
     "en-us": [
-        f"Tell me {NOUNS['en-us']} from {{collection}}", f"Tell {NOUNS['en-us']} from {{collection}}",
-        f"Read me {NOUNS['en-us']} from {{collection}}", f"Read {NOUNS['en-us']} from {{collection}}",
-        "Tell me the story {title} from {collection}", "Tell the story {title} from {collection}",
-        "Tell me the story about {title} from {collection}", "Tell the story about {title} from {collection}",
-        "Tell me the tale {title} from {collection}", "Tell the tale {title} from {collection}",
-        "Tell me the tale about {title} from {collection}", "Tell the tale about {title} from {collection}",
-        "Tell me the article {title} from {collection}", "Tell the article {title} from {collection}",
-        "Tell me the article about {title} from {collection}", "Tell the article about {title} from {collection}",
-        "Read me the story {title} from {collection}", "Read the story {title} from {collection}",
-        "Read me the story about {title} from {collection}", "Read the story about {title} from {collection}",
-        "Read me the tale {title} from {collection}", "Read the tale {title} from {collection}",
-        "Read me the tale about {title} from {collection}", "Read the tale about {title} from {collection}",
-        "Read me the article {title} from {collection}", "Read the article {title} from {collection}",
-        "Read me the article about {title} from {collection}", "Read the article about {title} from {collection}",
-        "Tell me a story by {collection}", "Tell me a {collection} story",
-        "Read me a story by {collection}", "Read me a {collection} story",
-        "Tell me a {collection} story about {title}", "Read me a {collection} story about {title}",
+        f"{VERB_ME['en-us']} {NOUNS['en-us']} (from|by) {{collection}}",
+        f"{VERB_ME['en-us']} the {BARE_NOUNS['en-us']} {{title}} (from|by) {{collection}}",
+        f"{VERB_ME['en-us']} a {{collection}} {BARE_NOUNS['en-us']}",
         "Find {title} by {collection}",
         "Find {title} from {collection}",
+        f"{VERB_ME['en-us']} {QUALIFIER_COLLECTION['en-us']} {BARE_NOUNS['en-us']} (from|by) {{collection}}",
     ],
     "da-dk": [
         f"Fortæl mig {NOUNS['da-dk']} fra {{collection}}", f"Fortæl {NOUNS['da-dk']} fra {{collection}}",
@@ -291,7 +422,9 @@ READ_BY_COLLECTION = {
 
 CONTINUE = {
     "en-us": ["Continue telling the story", "Continue telling the tale", "Continue reading",
-              "Continue the story", "Continue story", "Continue"],
+              "Continue the story", "Continue the article", "Continue story", "Continue",
+              "Resume", "Resume reading", "Resume the story",
+              "Keep reading", "Keep going", "Go on"],
     "da-dk": ["Fortsæt historien", "Fortsæt med at læse", "Fortsæt"],
     "de-de": ["Erzähl die Geschichte weiter", "Lies weiter", "Mach weiter", "Weiter"],
     "es-es": ["Continúa el cuento", "Sigue leyendo", "Continúa"],

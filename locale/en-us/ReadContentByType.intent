@@ -1,7 +1,1 @@
-Read me my {content_type}
-Read my {content_type}
-Tell me my {content_type}
-Tell my {content_type}
-What is my {content_type}
-Read me today's {content_type}
-Tell me today's {content_type}
+(Tell me|Tell|Read me|Read|Can you tell me|Can you tell|Can you read me|Can you read|Could you tell me|Could you tell|Could you read me|Could you read|Would you tell me|Would you tell|Would you read me|Would you read|Please tell me|Please tell|Please read me|Please read) (my|today's|todays) {content_type}

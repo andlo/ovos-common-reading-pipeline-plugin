@@ -29,7 +29,11 @@ import pytest
     ("en-us", "tell the story cinderella", "read_content"),  # "me" is optional
     ("en-us", "tell me a fairytale about the ugly duckling", "read_content"),
     ("en-us", "read me my horoscope", "read_by_type"),
-    ("en-us", "what is my horoscope", "read_by_type"),
+    # "What is my horoscope" deliberately no longer supported - real
+    # feedback: this is a reading pipeline, not a "what" pipeline
+    # (Common Query's domain) - see build_padacioso_intents.py's
+    # READ_CONTENT_BY_TYPE comment.
+    ("en-us", "what is my horoscope", None),
     ("en-us", "read me today's horoscope", "read_by_type"),
     ("en-us", "read me my almanac", "read_by_type"),
     ("en-us", "tell me today's weather report", "read_by_type"),

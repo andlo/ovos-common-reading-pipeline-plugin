@@ -1,32 +1,4 @@
-Tell me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
-Tell (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
-Read me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
-Read (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
-Tell me the story {title}
-Tell the story {title}
-Tell me the story about {title}
-Tell the story about {title}
-Tell me the tale {title}
-Tell the tale {title}
-Tell me the tale about {title}
-Tell the tale about {title}
-Tell me the article {title}
-Tell the article {title}
-Tell me the article about {title}
-Tell the article about {title}
-Read me the story {title}
-Read the story {title}
-Read me the story about {title}
-Read the story about {title}
-Read me the tale {title}
-Read the tale {title}
-Read me the tale about {title}
-Read the tale about {title}
-Read me the article {title}
-Read the article {title}
-Read me the article about {title}
-Read the article about {title}
-Can you read me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
-Can you read (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
-Can you tell me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
-Can you tell (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) about {title}
+(Tell me|Tell|Read me|Read|Can you tell me|Can you tell|Can you read me|Can you read|Could you tell me|Could you tell|Could you read me|Could you read|Would you tell me|Would you tell|Would you read me|Would you read|Please tell me|Please tell|Please read me|Please read) (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac|a paper|a post|posts|a blog|a blog post|blog posts|a summary|an update|a review|a guide|an essay) (about|regarding) {title}
+(Tell me|Tell|Read me|Read|Can you tell me|Can you tell|Can you read me|Can you read|Could you tell me|Could you tell|Could you read me|Could you read|Would you tell me|Would you tell|Would you read me|Would you read|Please tell me|Please tell|Please read me|Please read) the (story|tale|fairy tale|fairytale|article|piece of news|document|documents|report|reports|horoscope|almanac|paper|post|posts|blog|blog post|blog posts|summary|update|review|guide|essay) ({title}|about {title}|regarding {title})
+(Tell me|Tell|Read me|Read|Can you tell me|Can you tell|Can you read me|Can you read|Could you tell me|Could you tell|Could you read me|Could you read|Would you tell me|Would you tell|Would you read me|Would you read|Please tell me|Please tell|Please read me|Please read) the {title}
+(Tell me|Tell|Read me|Read|Can you tell me|Can you tell|Can you read me|Can you read|Could you tell me|Could you tell|Could you read me|Could you read|Would you tell me|Would you tell|Would you read me|Would you read|Please tell me|Please tell|Please read me|Please read) (latest|the latest|newest|the newest|most recent|the most recent) (story|tale|fairy tale|fairytale|article|piece of news|document|documents|report|reports|horoscope|almanac|paper|post|posts|blog|blog post|blog posts|summary|update|review|guide|essay) (about|regarding) {title}

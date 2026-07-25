@@ -1,36 +1,6 @@
-Tell me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) from {collection}
-Tell (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) from {collection}
-Read me (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) from {collection}
-Read (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac) from {collection}
-Tell me the story {title} from {collection}
-Tell the story {title} from {collection}
-Tell me the story about {title} from {collection}
-Tell the story about {title} from {collection}
-Tell me the tale {title} from {collection}
-Tell the tale {title} from {collection}
-Tell me the tale about {title} from {collection}
-Tell the tale about {title} from {collection}
-Tell me the article {title} from {collection}
-Tell the article {title} from {collection}
-Tell me the article about {title} from {collection}
-Tell the article about {title} from {collection}
-Read me the story {title} from {collection}
-Read the story {title} from {collection}
-Read me the story about {title} from {collection}
-Read the story about {title} from {collection}
-Read me the tale {title} from {collection}
-Read the tale {title} from {collection}
-Read me the tale about {title} from {collection}
-Read the tale about {title} from {collection}
-Read me the article {title} from {collection}
-Read the article {title} from {collection}
-Read me the article about {title} from {collection}
-Read the article about {title} from {collection}
-Tell me a story by {collection}
-Tell me a {collection} story
-Read me a story by {collection}
-Read me a {collection} story
-Tell me a {collection} story about {title}
-Read me a {collection} story about {title}
+(Tell me|Tell|Read me|Read|Can you tell me|Can you tell|Can you read me|Can you read|Could you tell me|Could you tell|Could you read me|Could you read|Would you tell me|Would you tell|Would you read me|Would you read|Please tell me|Please tell|Please read me|Please read) (a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac|a paper|a post|posts|a blog|a blog post|blog posts|a summary|an update|a review|a guide|an essay) (from|by) {collection}
+(Tell me|Tell|Read me|Read|Can you tell me|Can you tell|Can you read me|Can you read|Could you tell me|Could you tell|Could you read me|Could you read|Would you tell me|Would you tell|Would you read me|Would you read|Please tell me|Please tell|Please read me|Please read) the (story|tale|fairy tale|fairytale|article|piece of news|document|documents|report|reports|horoscope|almanac|paper|post|posts|blog|blog post|blog posts|summary|update|review|guide|essay) {title} (from|by) {collection}
+(Tell me|Tell|Read me|Read|Can you tell me|Can you tell|Can you read me|Can you read|Could you tell me|Could you tell|Could you read me|Could you read|Would you tell me|Would you tell|Would you read me|Would you read|Please tell me|Please tell|Please read me|Please read) a {collection} (story|tale|fairy tale|fairytale|article|piece of news|document|documents|report|reports|horoscope|almanac|paper|post|posts|blog|blog post|blog posts|summary|update|review|guide|essay)
 Find {title} by {collection}
 Find {title} from {collection}
+(Tell me|Tell|Read me|Read|Can you tell me|Can you tell|Can you read me|Can you read|Could you tell me|Could you tell|Could you read me|Could you read|Would you tell me|Would you tell|Would you read me|Would you read|Please tell me|Please tell|Please read me|Please read) (latest|newest|most recent) (story|tale|fairy tale|fairytale|article|piece of news|document|documents|report|reports|horoscope|almanac|paper|post|posts|blog|blog post|blog posts|summary|update|review|guide|essay) (from|by) {collection}
