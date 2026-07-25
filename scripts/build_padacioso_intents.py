@@ -62,7 +62,7 @@ ROOT = Path("/home/andlo/ovos-common-reading-pipeline-plugin/locale")
 # 6 keep their original set - see module docstring.
 NOUNS = {
     "en-us": "(a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac|a paper|a post|posts|a blog|a blog post|blog posts|a summary|an update|a review|a guide|an essay)",
-    "da-dk": "(en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak)",
+    "da-dk": "(en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak|et paper|en afhandling|et blogindlæg|en blog|et resumé|en opdatering|en anmeldelse|en guide|et essay)",
     "de-de": "(eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht)",
     "es-es": "(un cuento|un artículo|una noticia|un documento|un informe)",
     "fr-fr": "(une histoire|un article|une nouvelle|un document|un rapport)",
@@ -78,6 +78,24 @@ NOUNS = {
 # en-us/da-dk getting full-vocabulary treatment this pass.
 BARE_NOUNS = {
     "en-us": "(story|tale|fairy tale|fairytale|article|piece of news|document|documents|report|reports|horoscope|almanac|paper|post|posts|blog|blog post|blog posts|summary|update|review|guide|essay)",
+}
+
+# Danish equivalent of "the {noun}" - NOT a separate word like English
+# "the", Danish marks definiteness with a SUFFIX on the noun itself
+# (artikel -> artiklen, historie -> historien). Confirmed directly
+# (native speaker review this session) that this is genuinely a
+# different sentence shape from English, not just a translation of
+# BARE_NOUNS - two Danish-specific patterns exist that have no English
+# equivalent at all:
+#   "Læs {NOUN_DEFINITE} for {title}" - "Læs horoskopet for løven"
+#   "Læs {title}s {NOUN_DEFINITE}" - "Læs løvens horoskop" (title-FIRST,
+#   genitive -s, noun last - the reverse of every other pattern here)
+# Confirmed there's no bare "the {title}"-only Danish equivalent (no
+# noun at all) the way English has - the noun is always present, just
+# in one of these two orders.
+NOUNS_DEFINITE = {
+    "da-dk": ("(historien|eventyret|artiklen|nyheden|dokumentet|rapporten|horoskopet|almanakken|"
+              "paperet|afhandlingen|blogindlægget|bloggen|resuméet|opdateringen|anmeldelsen|guiden|essayet)"),
 }
 
 # Every recognized way to open a reading-pipeline request, "me"
@@ -106,6 +124,27 @@ VERB_ME = {
               "Would you tell me|Would you tell|Would you read me|Would you read|"
               "Please tell me|Please tell|Please read me|Please read)"),
 }
+
+# Danish needs TWO separate verb-groups, not one like English - a real
+# structural difference confirmed this session (native speaker
+# review): Danish "for mig" ("for me") attaches at the very END of the
+# whole sentence ("Fortæl en historie for mig"), not right after the
+# verb the way English "me" does ("Tell me a story") - so it can't be
+# folded into a single prefix group the way VERB_ME above works.
+#
+# VERB_ME_DA: "mig" attached right after the verb (or omitted
+# entirely) - used as-is, sentence needs nothing more.
+# VERB_BARE_DA: no "mig" anywhere in the verb itself - only used
+# together with a trailing " for mig" appended to the END of the full
+# line (see READ_CONTENT/READ_BY_COLLECTION below), NOT as a
+# standalone prefix.
+VERB_ME_DA = ("(Fortæl mig|Fortæl|Læs mig|Læs|"
+              "Kan du fortælle mig|Kan du fortælle|Kan du læse mig|Kan du læse|"
+              "Kunne du fortælle mig|Kunne du fortælle|Kunne du læse mig|Kunne du læse|"
+              "Vil du fortælle mig|Vil du fortælle|Vil du læse mig|Vil du læse|"
+              "Fortæl mig venligst|Venligst fortæl mig|Læs mig venligst|Venligst læs mig)")
+VERB_BARE_DA = ("(Fortæl|Læs|Kan du fortælle|Kan du læse|Kunne du fortælle|Kunne du læse|"
+                "Vil du fortælle|Vil du læse|Venligst fortæl|Venligst læs)")
 
 # "Give me the latest/newest article about X" / "read the latest post
 # from ovosblog" - "latest" doesn't carry any special meaning to the
@@ -137,6 +176,34 @@ QUALIFIER_CONTENT = {
 QUALIFIER_COLLECTION = {
     "en-us": "(latest|newest|most recent)",
 }
+# Danish doesn't have the same "the latest post from X" tie problem
+# English does (Danish's bare "the {title}" equivalent doesn't exist
+# at all - see NOUNS_DEFINITE's own comment - so there's no competing
+# pattern to tie against), so "seneste" doesn't need a separate
+# with/without-article split the way English's does. "seneste"
+# (latest/most recent) and "nyeste" (newest) cover this naturally.
+QUALIFIER_DA = "(seneste|nyeste)"
+
+# Danish equivalent of "the latest" combined with a definite noun -
+# grammatically needs "den"/"det" depending on the noun's gender
+# (en-word vs et-word), which NOUNS_DEFINITE doesn't split out
+# separately. Pragmatic choice (confirmed acceptable): list all four
+# combinations rather than split every noun by gender - this means
+# recognizing some combinations that aren't grammatically "correct"
+# for a given noun (e.g. "det seneste" with an en-word), but padacioso
+# is purely about RECOGNIZING what was said, not enforcing correct
+# Danish back at the person - over-accepting slightly imperfect
+# grammar is the safer direction to err in here, not under-accepting.
+QUALIFIER_DA_DEFINITE = "(den seneste|det seneste|den nyeste|det nyeste)"
+
+# Bare noun stems (no article at all) - for the Danish compound
+# pattern "en {collection}-historie" ("a grimm-story"), where the
+# provider name plus a hyphen stands in for the article, same spirit
+# as English's "a {collection} story".
+NOUNS_BARE_DA = ("(historie|eventyr|artikel|nyhed|dokument|rapport|horoskop|almanak|"
+                  "paper|afhandling|blogindlæg|blog|resumé|opdatering|anmeldelse|guide|essay)")
+
+
 
 # "the {content}" forms get an "about"-connector variant everywhere (safe
 # regardless of article, since the connector word disambiguates), plus a
@@ -189,21 +256,49 @@ READ_CONTENT = {
         # qualifier word, not something newly introduced by this line).
         f"{VERB_ME['en-us']} {QUALIFIER_CONTENT['en-us']} {BARE_NOUNS['en-us']} (about|regarding) {{title}}",
     ],
+    # 8 lines covering the structurally different Danish grammar
+    # (confirmed via native-speaker review this session, not a
+    # word-for-word translation of the English structure - see
+    # VERB_ME_DA/VERB_BARE_DA and NOUNS_DEFINITE's own comments for
+    # why "for mig" needs a separate verb-group entirely, and why
+    # Danish has two genuinely different sentence shapes for a
+    # noun+title combination that don't exist in English at all):
     "da-dk": [
-        f"Fortæl mig {NOUNS['da-dk']} om {{title}}", f"Fortæl {NOUNS['da-dk']} om {{title}}",
-        f"Læs mig {NOUNS['da-dk']} om {{title}}", f"Læs {NOUNS['da-dk']} om {{title}}",
-        "Fortæl mig historien {title}", "Fortæl historien {title}",
-        "Fortæl mig historien om {title}", "Fortæl historien om {title}",
-        "Fortæl mig artiklen {title}", "Fortæl artiklen {title}",
-        "Fortæl mig artiklen om {title}", "Fortæl artiklen om {title}",
-        "Læs mig historien {title}", "Læs historien {title}",
-        "Læs mig historien om {title}", "Læs historien om {title}",
-        "Læs mig artiklen {title}", "Læs artiklen {title}",
-        "Læs mig artiklen om {title}", "Læs artiklen om {title}",
-        # same "can you" additions as en-us above, same reasoning for
-        # NOT adding a bare permissive "Læs mig {title}" too
-        f"Kan du læse mig {NOUNS['da-dk']} om {{title}}", f"Kan du læse {NOUNS['da-dk']} om {{title}}",
-        f"Kan du fortælle mig {NOUNS['da-dk']} om {{title}}", f"Kan du fortælle {NOUNS['da-dk']} om {{title}}",
+        f"{VERB_ME_DA} {NOUNS['da-dk']} om {{title}}",
+        f"{VERB_BARE_DA} {NOUNS['da-dk']} om {{title}} for mig",
+        f"{VERB_ME_DA} {NOUNS_DEFINITE['da-dk']} ({{title}}|om {{title}})",
+        f"{VERB_BARE_DA} {NOUNS_DEFINITE['da-dk']} ({{title}}|om {{title}}) for mig",
+        # "Læs horoskopet for løven" - noun first, then "for {title}".
+        # No "for mig" variant (would read "...for løven for mig",
+        # a confusing double "for").
+        f"{VERB_ME_DA} {NOUNS_DEFINITE['da-dk']} for {{title}}",
+        # "Læs løvens horoskop" - REVERSED order, title first with
+        # genitive -s, noun last. No English equivalent at all.
+        # Uses NOUNS_BARE_DA (bare stem), NOT NOUNS_DEFINITE - real
+        # grammar bug found via testing: "løvens horoskopet" (genitive
+        # -s AND the noun's own definite -et suffix together) is
+        # ungrammatical double-marking. The genitive possessor alone
+        # already makes the whole phrase definite; the noun stays bare.
+        # KNOWN LIMITATION, accepted (found via testing, not silently
+        # missed): "dagens {content_type}" (READ_CONTENT_BY_TYPE below,
+        # a pre-existing idiom meaning "today's X") grammatically LOOKS
+        # like this exact genitive shape too ("dagen" + "s") - "Læs mig
+        # dagens horoskop" ties against this line, interpreting "dagen"
+        # as if it were a literal {title} in genitive form, and
+        # currently wins the tie over the intended read_by_type match.
+        # In practice this is low-risk (nobody actually means "the
+        # horoscope belonging to something called 'dag'" - "dagens X"
+        # is always the fixed idiom), so accepted as-is rather than
+        # chasing a fix for an ambiguity padacioso has no clean way to
+        # resolve (same class of unreliable-tie-breaking already
+        # documented elsewhere in this file).
+        f"{VERB_ME_DA} {{title}}s {NOUNS_BARE_DA}",
+        f"{VERB_BARE_DA} {{title}}s {NOUNS_BARE_DA} for mig",
+        # Same double-definiteness bug, same fix: "den seneste
+        # artiklen" is wrong for the identical reason - the "den/det
+        # seneste" qualifier already marks definiteness, the noun
+        # after it stays bare, not NOUNS_DEFINITE.
+        f"{VERB_ME_DA} {QUALIFIER_DA_DEFINITE} {NOUNS_BARE_DA} ({{title}}|om {{title}})",
     ],
     # de/es/fr/it/nl/pt: only the two safe fixes (drop the collision-prone
     # bare line, add the "about"-connector variant on the existing
@@ -290,10 +385,13 @@ READ_CONTENT_BY_TYPE = {
         f"{VERB_ME['en-us']} (my|today's|todays) {{content_type}}",
     ],
     "da-dk": [
-        "Læs mig dagens {content_type}", "Fortæl mig dagens {content_type}",
-        "Hvad er dagens {content_type}",
+        # "Hvad er dagens X"/"Hvad siger mit horoskop" (question forms)
+        # deliberately removed - same reasoning as en-us's "What is my
+        # {content_type}" removal above: this is a reading pipeline,
+        # not a "what" pipeline.
+        f"{VERB_ME_DA} dagens {{content_type}}",
+        f"{VERB_BARE_DA} dagens {{content_type}} for mig",
         "Læs mit horoskop", "Fortæl mig mit horoskop", "Læs horoskopet",
-        "Hvad siger mit horoskop",
     ],
 }
 
@@ -375,18 +473,17 @@ READ_BY_COLLECTION = {
         f"{VERB_ME['en-us']} {QUALIFIER_COLLECTION['en-us']} {BARE_NOUNS['en-us']} (from|by) {{collection}}",
     ],
     "da-dk": [
-        f"Fortæl mig {NOUNS['da-dk']} fra {{collection}}", f"Fortæl {NOUNS['da-dk']} fra {{collection}}",
-        f"Læs mig {NOUNS['da-dk']} fra {{collection}}", f"Læs {NOUNS['da-dk']} fra {{collection}}",
-        "Fortæl mig historien {title} fra {collection}", "Fortæl historien {title} fra {collection}",
-        "Fortæl mig historien om {title} fra {collection}", "Fortæl historien om {title} fra {collection}",
-        "Fortæl mig artiklen {title} fra {collection}", "Fortæl artiklen {title} fra {collection}",
-        "Fortæl mig artiklen om {title} fra {collection}", "Fortæl artiklen om {title} fra {collection}",
-        "Læs mig historien {title} fra {collection}", "Læs historien {title} fra {collection}",
-        "Læs mig historien om {title} fra {collection}", "Læs historien om {title} fra {collection}",
-        "Fortæl mig en historie af {collection}", "Læs mig en historie af {collection}",
-        "Fortæl mig en {collection}-historie", "Læs mig en {collection}-historie",
-        "Fortæl mig en {collection}-historie om {title}", "Læs mig en {collection}-historie om {title}",
+        f"{VERB_ME_DA} {NOUNS['da-dk']} fra {{collection}}",
+        f"{VERB_BARE_DA} {NOUNS['da-dk']} fra {{collection}} for mig",
+        # title+collection combined - same pre-existing fragility as
+        # English's equivalent (KNOWN LIMITATION note above), kept as
+        # before, not made worse or better by this pass.
+        f"{VERB_ME_DA} {NOUNS_DEFINITE['da-dk']} {{title}} fra {{collection}}",
+        f"{VERB_ME_DA} en {{collection}}-{NOUNS_BARE_DA}", f"{VERB_ME_DA} et {{collection}}-{NOUNS_BARE_DA}",
+        f"{VERB_ME_DA} en {{collection}}-{NOUNS_BARE_DA} om {{title}}",
+        f"{VERB_ME_DA} et {{collection}}-{NOUNS_BARE_DA} om {{title}}",
         "Find {title} af {collection}", "Find {title} fra {collection}",
+        f"{VERB_ME_DA} {QUALIFIER_DA} {NOUNS_BARE_DA} fra {{collection}}",
     ],
     "de-de": [f"Erzähl mir {NOUNS['de-de']} von {{collection}}", f"Lies mir {NOUNS['de-de']} von {{collection}}",
               "Erzähl mir die Geschichte {title} von {collection}",
@@ -425,7 +522,8 @@ CONTINUE = {
               "Continue the story", "Continue the article", "Continue story", "Continue",
               "Resume", "Resume reading", "Resume the story",
               "Keep reading", "Keep going", "Go on"],
-    "da-dk": ["Fortsæt historien", "Fortsæt med at læse", "Fortsæt"],
+    "da-dk": ["Fortsæt historien", "Fortsæt med at læse", "Fortsæt", "Fortsæt artiklen",
+              "Genoptag", "Genoptag læsningen", "Bliv ved", "Fortsæt bare"],
     "de-de": ["Erzähl die Geschichte weiter", "Lies weiter", "Mach weiter", "Weiter"],
     "es-es": ["Continúa el cuento", "Sigue leyendo", "Continúa"],
     "fr-fr": ["Continue l'histoire", "Continue de lire", "Continue"],

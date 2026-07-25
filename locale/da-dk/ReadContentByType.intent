@@ -1,7 +1,5 @@
-Læs mig dagens {content_type}
-Fortæl mig dagens {content_type}
-Hvad er dagens {content_type}
+(Fortæl mig|Fortæl|Læs mig|Læs|Kan du fortælle mig|Kan du fortælle|Kan du læse mig|Kan du læse|Kunne du fortælle mig|Kunne du fortælle|Kunne du læse mig|Kunne du læse|Vil du fortælle mig|Vil du fortælle|Vil du læse mig|Vil du læse|Fortæl mig venligst|Venligst fortæl mig|Læs mig venligst|Venligst læs mig) dagens {content_type}
+(Fortæl|Læs|Kan du fortælle|Kan du læse|Kunne du fortælle|Kunne du læse|Vil du fortælle|Vil du læse|Venligst fortæl|Venligst læs) dagens {content_type} for mig
 Læs mit horoskop
 Fortæl mig mit horoskop
 Læs horoskopet
-Hvad siger mit horoskop

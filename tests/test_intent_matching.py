@@ -45,7 +45,9 @@ import pytest
     ("da-dk", "fortæl mig historien om den lille havfrue", "read_content"),
     ("da-dk", "fortæl historien askepot", "read_content"),  # "mig" is optional
     ("da-dk", "læs mit horoskop", "read_by_type"),
-    ("da-dk", "hvad er dagens horoskop", "read_by_type"),
+    # "Hvad er dagens X" deliberately no longer supported - same
+    # reasoning as en-us's "What is my X" removal above.
+    ("da-dk", "hvad er dagens horoskop", None),
     ("de-de", "erzähl mir eine geschichte über aschenputtel", "read_content"),
     ("de-de", "erzähl mir eine geschichte von grimm", "read_by_collection"),
     ("de-de", "weiter", "continue"),

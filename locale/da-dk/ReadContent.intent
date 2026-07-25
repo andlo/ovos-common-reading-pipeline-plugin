@@ -1,24 +1,8 @@
-Fortæl mig (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
-Fortæl (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
-Læs mig (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
-Læs (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
-Fortæl mig historien {title}
-Fortæl historien {title}
-Fortæl mig historien om {title}
-Fortæl historien om {title}
-Fortæl mig artiklen {title}
-Fortæl artiklen {title}
-Fortæl mig artiklen om {title}
-Fortæl artiklen om {title}
-Læs mig historien {title}
-Læs historien {title}
-Læs mig historien om {title}
-Læs historien om {title}
-Læs mig artiklen {title}
-Læs artiklen {title}
-Læs mig artiklen om {title}
-Læs artiklen om {title}
-Kan du læse mig (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
-Kan du læse (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
-Kan du fortælle mig (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
-Kan du fortælle (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak) om {title}
+(Fortæl mig|Fortæl|Læs mig|Læs|Kan du fortælle mig|Kan du fortælle|Kan du læse mig|Kan du læse|Kunne du fortælle mig|Kunne du fortælle|Kunne du læse mig|Kunne du læse|Vil du fortælle mig|Vil du fortælle|Vil du læse mig|Vil du læse|Fortæl mig venligst|Venligst fortæl mig|Læs mig venligst|Venligst læs mig) (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak|et paper|en afhandling|et blogindlæg|en blog|et resumé|en opdatering|en anmeldelse|en guide|et essay) om {title}
+(Fortæl|Læs|Kan du fortælle|Kan du læse|Kunne du fortælle|Kunne du læse|Vil du fortælle|Vil du læse|Venligst fortæl|Venligst læs) (en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak|et paper|en afhandling|et blogindlæg|en blog|et resumé|en opdatering|en anmeldelse|en guide|et essay) om {title} for mig
+(Fortæl mig|Fortæl|Læs mig|Læs|Kan du fortælle mig|Kan du fortælle|Kan du læse mig|Kan du læse|Kunne du fortælle mig|Kunne du fortælle|Kunne du læse mig|Kunne du læse|Vil du fortælle mig|Vil du fortælle|Vil du læse mig|Vil du læse|Fortæl mig venligst|Venligst fortæl mig|Læs mig venligst|Venligst læs mig) (historien|eventyret|artiklen|nyheden|dokumentet|rapporten|horoskopet|almanakken|paperet|afhandlingen|blogindlægget|bloggen|resuméet|opdateringen|anmeldelsen|guiden|essayet) ({title}|om {title})
+(Fortæl|Læs|Kan du fortælle|Kan du læse|Kunne du fortælle|Kunne du læse|Vil du fortælle|Vil du læse|Venligst fortæl|Venligst læs) (historien|eventyret|artiklen|nyheden|dokumentet|rapporten|horoskopet|almanakken|paperet|afhandlingen|blogindlægget|bloggen|resuméet|opdateringen|anmeldelsen|guiden|essayet) ({title}|om {title}) for mig
+(Fortæl mig|Fortæl|Læs mig|Læs|Kan du fortælle mig|Kan du fortælle|Kan du læse mig|Kan du læse|Kunne du fortælle mig|Kunne du fortælle|Kunne du læse mig|Kunne du læse|Vil du fortælle mig|Vil du fortælle|Vil du læse mig|Vil du læse|Fortæl mig venligst|Venligst fortæl mig|Læs mig venligst|Venligst læs mig) (historien|eventyret|artiklen|nyheden|dokumentet|rapporten|horoskopet|almanakken|paperet|afhandlingen|blogindlægget|bloggen|resuméet|opdateringen|anmeldelsen|guiden|essayet) for {title}
+(Fortæl mig|Fortæl|Læs mig|Læs|Kan du fortælle mig|Kan du fortælle|Kan du læse mig|Kan du læse|Kunne du fortælle mig|Kunne du fortælle|Kunne du læse mig|Kunne du læse|Vil du fortælle mig|Vil du fortælle|Vil du læse mig|Vil du læse|Fortæl mig venligst|Venligst fortæl mig|Læs mig venligst|Venligst læs mig) {title}s (historie|eventyr|artikel|nyhed|dokument|rapport|horoskop|almanak|paper|afhandling|blogindlæg|blog|resumé|opdatering|anmeldelse|guide|essay)
+(Fortæl|Læs|Kan du fortælle|Kan du læse|Kunne du fortælle|Kunne du læse|Vil du fortælle|Vil du læse|Venligst fortæl|Venligst læs) {title}s (historie|eventyr|artikel|nyhed|dokument|rapport|horoskop|almanak|paper|afhandling|blogindlæg|blog|resumé|opdatering|anmeldelse|guide|essay) for mig
+(Fortæl mig|Fortæl|Læs mig|Læs|Kan du fortælle mig|Kan du fortælle|Kan du læse mig|Kan du læse|Kunne du fortælle mig|Kunne du fortælle|Kunne du læse mig|Kunne du læse|Vil du fortælle mig|Vil du fortælle|Vil du læse mig|Vil du læse|Fortæl mig venligst|Venligst fortæl mig|Læs mig venligst|Venligst læs mig) (den seneste|det seneste|den nyeste|det nyeste) (historie|eventyr|artikel|nyhed|dokument|rapport|horoskop|almanak|paper|afhandling|blogindlæg|blog|resumé|opdatering|anmeldelse|guide|essay) ({title}|om {title})
