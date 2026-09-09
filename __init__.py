@@ -138,8 +138,14 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         activate' with our own skill_id - rather than the method
         itself, which isn't available on our base classes."""
         msg = dig_for_message() or Message("")
-        if "skill_id" not in msg.context:
-            msg.context["skill_id"] = self.skill_id
+        # Stamped unconditionally, not only when the key is absent: dig_for_message()
+        # returns the in-flight message, which almost always already carries some
+        # OTHER skill's identity in its context (whoever emitted the utterance that
+        # led here). Only overwriting when the key was missing left payload and
+        # context disagreeing on who this request is from - ovos-core's
+        # _activate_allowed compares the two and silently refuses the activation
+        # whenever they differ, which is whenever cross_activation is off. See #37.
+        msg.context["skill_id"] = self.skill_id
         self.bus.emit(msg.forward("intent.service.skills.activate",
                                    data={"skill_id": self.skill_id, "timeout": duration_minutes}))
 
@@ -147,8 +153,9 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         """Companion to _activate() above - same reasoning, replicates
         ConversationalSkill.deactivate()'s own bus message directly."""
         msg = dig_for_message() or Message("")
-        if "skill_id" not in msg.context:
-            msg.context["skill_id"] = self.skill_id
+        # Same reasoning as _activate() above - stamp unconditionally so payload
+        # and context agree regardless of whose message is in flight. See #37.
+        msg.context["skill_id"] = self.skill_id
         self.bus.emit(msg.forward("intent.service.skills.deactivate",
                                    data={"skill_id": self.skill_id}))
 
