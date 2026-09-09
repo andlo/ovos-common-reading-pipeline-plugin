@@ -4,12 +4,14 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from ovos_bus_client.message import Message
 
 _INIT_PATH = Path(__file__).resolve().parents[1] / "__init__.py"
 _spec = importlib.util.spec_from_file_location("common_reading_pipeline", _INIT_PATH)
 _module = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_module)
 
+module = _module  # exposed so tests can monkeypatch module-level names (e.g. dig_for_message)
 CommonReadingPipeline = _module.CommonReadingPipeline
 ContentFetchError = _module.ContentFetchError
 pick_best_candidate = _module.pick_best_candidate
