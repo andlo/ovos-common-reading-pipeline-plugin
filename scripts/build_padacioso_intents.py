@@ -6,9 +6,10 @@ avoiding padacioso's unreliable '(word| )' empty-alternative syntax
 omitted) - every optional word (including "me", articles, connectors)
 is instead written out as full separate alternative lines. Also adds
 natural 'about'/'sobre'/'über' connector-word phrasings, and broadens
-content-type vocabulary (story/tale/fairy tale/article/news/document/
+content-type vocabulary (story/tale/fairy tale/article/document/
 report/horoscope/almanac) - this is a general reading pipeline now,
-not just a storyteller.
+not just a storyteller. The news is the one kind of text it leaves
+alone, see NOUNS.
 
 Real gaps found via user testing that this addresses:
 - "Tell me about {title}" (a bare catch-all, no content-type word
@@ -60,15 +61,27 @@ ROOT = Path("/home/andlo/ovos-common-reading-pipeline-plugin/locale")
 # content-noun phrases (with grammatically correct article), per language.
 # en-us/da-dk expanded with fairy tale/tale/horoscope/almanac; the other
 # 6 keep their original set - see module docstring.
+#
+# No word for the news ("a piece of news", "en nyhed"/"nyheden", "eine
+# Nachricht", "una noticia", "una notizia", "een nieuwsbericht", "uma
+# notícia"). This plugin sits right after the stop matcher, ahead of every
+# news skill, so "read me the latest news about France" claimed here never
+# reached one - and no provider in this family serves the news. French
+# keeps "une nouvelle": in a reading request it is the literary short story
+# (Maupassant, Daudet) as often as a news item, and French asks for the
+# news in the plural ("les nouvelles", "les actualités"), which no line
+# here matches. The open slots that can still name the news - English's
+# bare "the {title}" and "my/today's {content_type}", Danish "dagens
+# {content_type}" - are declined in match() against locale/<lang>/news.voc.
 NOUNS = {
-    "en-us": "(a story|a tale|a fairy tale|a fairytale|an article|a piece of news|a document|documents|a report|reports|a horoscope|an almanac|a paper|a post|posts|a blog|a blog post|blog posts|a summary|an update|a review|a guide|an essay)",
-    "da-dk": "(en historie|et eventyr|en artikel|en nyhed|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak|et paper|en afhandling|et blogindlæg|en blog|et resumé|en opdatering|en anmeldelse|en guide|et essay)",
-    "de-de": "(eine Geschichte|einen Artikel|eine Nachricht|ein Dokument|einen Bericht|ein Paper|einen Blogbeitrag|einen Blog|eine Zusammenfassung|ein Update|eine Rezension|einen Leitfaden|einen Essay)",
-    "es-es": "(un cuento|un artículo|una noticia|un documento|un informe|un paper|una entrada de blog|un blog|un resumen|una actualización|una reseña|una guía|un ensayo)",
+    "en-us": "(a story|a tale|a fairy tale|a fairytale|an article|a document|documents|a report|reports|a horoscope|an almanac|a paper|a post|posts|a blog|a blog post|blog posts|a summary|an update|a review|a guide|an essay)",
+    "da-dk": "(en historie|et eventyr|en artikel|et dokument|dokumenter|en rapport|rapporter|et horoskop|en almanak|et paper|en afhandling|et blogindlæg|en blog|et resumé|en opdatering|en anmeldelse|en guide|et essay)",
+    "de-de": "(eine Geschichte|einen Artikel|ein Dokument|einen Bericht|ein Paper|einen Blogbeitrag|einen Blog|eine Zusammenfassung|ein Update|eine Rezension|einen Leitfaden|einen Essay)",
+    "es-es": "(un cuento|un artículo|un documento|un informe|un paper|una entrada de blog|un blog|un resumen|una actualización|una reseña|una guía|un ensayo)",
     "fr-fr": "(une histoire|un article|une nouvelle|un document|un rapport|un papier|un article de blog|un blog|un résumé|une mise à jour|une critique|un guide|un essai)",
-    "it-it": "(una storia|un articolo|una notizia|un documento|un rapporto|un paper|un post del blog|un blog|un riassunto|un aggiornamento|una recensione|una guida|un saggio)",
-    "nl-nl": "(een verhaal|een artikel|een nieuwsbericht|een document|een rapport|een paper|een blogpost|een blog|een samenvatting|een update|een recensie|een gids|een essay)",
-    "pt-pt": "(uma história|um artigo|uma notícia|um documento|um relatório|um paper|uma publicação no blog|um blog|um resumo|uma atualização|uma crítica|um guia|um ensaio)",
+    "it-it": "(una storia|un articolo|un documento|un rapporto|un paper|un post del blog|un blog|un riassunto|un aggiornamento|una recensione|una guida|un saggio)",
+    "nl-nl": "(een verhaal|een artikel|een document|een rapport|een paper|een blogpost|een blog|een samenvatting|een update|een recensie|een gids|een essay)",
+    "pt-pt": "(uma história|um artigo|um documento|um relatório|um paper|uma publicação no blog|um blog|um resumo|uma atualização|uma crítica|um guia|um ensaio)",
 }
 
 # Same words as NOUNS, without the leading article - for "the {noun}
@@ -77,7 +90,7 @@ NOUNS = {
 # grimm a story"). en-us only for now, see module docstring re: only
 # en-us/da-dk getting full-vocabulary treatment this pass.
 BARE_NOUNS = {
-    "en-us": "(story|tale|fairy tale|fairytale|article|piece of news|document|documents|report|reports|horoscope|almanac|paper|post|posts|blog|blog post|blog posts|summary|update|review|guide|essay)",
+    "en-us": "(story|tale|fairy tale|fairytale|article|document|documents|report|reports|horoscope|almanac|paper|post|posts|blog|blog post|blog posts|summary|update|review|guide|essay)",
 }
 
 # Danish equivalent of "the {noun}" - NOT a separate word like English
@@ -94,7 +107,7 @@ BARE_NOUNS = {
 # noun at all) the way English has - the noun is always present, just
 # in one of these two orders.
 NOUNS_DEFINITE = {
-    "da-dk": ("(historien|eventyret|artiklen|nyheden|dokumentet|rapporten|horoskopet|almanakken|"
+    "da-dk": ("(historien|eventyret|artiklen|dokumentet|rapporten|horoskopet|almanakken|"
               "paperet|afhandlingen|blogindlægget|bloggen|resuméet|opdateringen|anmeldelsen|guiden|essayet)"),
 }
 
@@ -200,7 +213,7 @@ QUALIFIER_DA_DEFINITE = "(den seneste|det seneste|den nyeste|det nyeste)"
 # pattern "en {collection}-historie" ("a grimm-story"), where the
 # provider name plus a hyphen stands in for the article, same spirit
 # as English's "a {collection} story".
-NOUNS_BARE_DA = ("(historie|eventyr|artikel|nyhed|dokument|rapport|horoskop|almanak|"
+NOUNS_BARE_DA = ("(historie|eventyr|artikel|dokument|rapport|horoskop|almanak|"
                   "paper|afhandling|blogindlæg|blog|resumé|opdatering|anmeldelse|guide|essay)")
 
 
@@ -210,10 +223,10 @@ NOUNS_BARE_DA = ("(historie|eventyr|artikel|nyhed|dokument|rapport|horoskop|alma
 # bare "the {content} {title}" form for the most common words specifically
 # (story/tale/article) - not exhaustively for every word, since "the
 # document {title}"-style bare reference is unusual phrasing for most of
-# the newer, less title-oriented nouns (news/report/horoscope/almanac).
+# the newer, less title-oriented nouns (report/horoscope/almanac).
 READ_CONTENT = {
     # Three lines cover the entire combinatorial space discussed and
-    # tested this session (20 verb+me phrasings x 23 nouns x optional
+    # tested this session (20 verb+me phrasings x 22 nouns x optional
     # about/regarding connector, all as required-choice alternation
     # groups folded into single lines - confirmed directly that
     # padacioso handles this cleanly, avoiding the ~10x line-count
@@ -244,6 +257,10 @@ READ_CONTENT = {
     #    reverted - see git history). "the" is a strong enough
     #    grammatical marker that it doesn't overlap with either of
     #    those other patterns' own required wording.
+    #    It also takes "read the news" and "read me the latest news
+    #    about france" (title "news", "latest news about france"), which
+    #    belong to news skills: match() declines a title naming the news
+    #    (locale/en-us/news.voc) rather than this line trying to.
     "en-us": [
         f"{VERB_ME['en-us']} {NOUNS['en-us']} (about|regarding) {{title}}",
         f"{VERB_ME['en-us']} the {BARE_NOUNS['en-us']} ({{title}}|about {{title}}|regarding {{title}})",
@@ -371,6 +388,10 @@ READ_CONTENT = {
 # (today's - gender-invariant) for the wildcard-based lines, and
 # hardcoding a couple of horoscope-specific "mit"/definite forms as
 # their own literal (non-wildcard) lines instead.
+#
+# The open {content_type} also takes "read me today's news" / "læs mig
+# dagens nyheder"; match() declines those against locale/<lang>/news.voc,
+# since they belong to news skills.
 READ_CONTENT_BY_TYPE = {
     # "What is my {content_type}" deliberately removed - real feedback:
     # this is a reading pipeline, not a "what" pipeline (Common Query's

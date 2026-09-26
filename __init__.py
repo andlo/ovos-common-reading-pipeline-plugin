@@ -58,6 +58,7 @@ import random
 import re
 import threading
 import time
+import unicodedata
 from os.path import dirname
 from typing import Dict, List, Optional, Union
 
@@ -110,6 +111,16 @@ INTENT_FILES = {
     "continue": "continue.intent",
     "pause": "pause.intent",
 }
+# A request for the news ("read the news", "read me the latest news about
+# France", "read me today's news") belongs to news skills. They come later in
+# the pipeline than this plugin, so whatever it claims never reaches them, and
+# no provider in this family serves the news. The intents list no word for the
+# news as a kind of text (see scripts/build_padacioso_intents.py), but their
+# open slots can still capture one: English "read the {title}" and "read me
+# my/today's {content_type}", Danish "læs dagens {content_type}". match()
+# declines a title or content type holding a phrase from this file
+# (locale/<lang>/news.voc); a language without one declines nothing.
+NEWS_VOC = "news.voc"
 # ...and each intent name -> the method that handles its dispatch. ovos-core
 # dispatches a claimed utterance on "<skill_id>:<intent name>" (the
 # match_type match() returns) and ends the turn when that handler reports
@@ -284,6 +295,14 @@ def migrate_bookmark(paragraphs: List[str], legacy_index: int) -> int:
     return index
 
 
+def _fold(text: str) -> str:
+    """Lower case, accents off, spaces collapsed: "Latest  NEWS" and
+    "latest news" compare equal, whichever way padacioso handed it over."""
+    text = unicodedata.normalize("NFKD", str(text).lower())
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return " ".join(text.split())
+
+
 def pick_best_candidate(candidates):
     """Pure helper (kept separate from the bus mechanics so it's easy to
     unit test): given a list of search.response payloads from provider
@@ -354,6 +373,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         self._state_lock = threading.RLock()
         self._intent_containers = {}  # locale folder name -> trained padacioso IntentContainer
         self._containers_lock = threading.Lock()
+        self._news_words = {}  # locale folder name -> the phrases of its news.voc
 
     def _register_intent_handlers(self):
         """Register a handler for every match type match() can return.
@@ -594,6 +614,30 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             self._intent_containers[key] = container
             return container
 
+    def _news_phrases(self, lang) -> List[str]:
+        """The phrases in locale/<lang>/news.voc, folded with _fold()."""
+        lang_dir = self._locale_dir_for(lang)
+        key = os.path.basename(lang_dir)
+        if key not in self._news_words:
+            path = os.path.join(lang_dir, NEWS_VOC)
+            phrases = []
+            if os.path.isfile(path):
+                with open(path, encoding="utf-8") as f:
+                    phrases = [_fold(line) for line in f
+                               if line.strip() and not line.lstrip().startswith("#")]
+            self._news_words[key] = phrases
+        return self._news_words[key]
+
+    def _asks_for_news(self, entities: dict, lang) -> bool:
+        """Whether the title or content type match() captured names the
+        news ("news", "latest news about france", "dagens nyheder")."""
+        phrases = self._news_phrases(lang)
+        for slot in ("title", "content_type"):
+            text = _fold(entities.get(slot) or "")
+            if text and any(re.search(rf"(?<!\w){re.escape(p)}(?!\w)", text) for p in phrases):
+                return True
+        return False
+
     def match(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
         """Classify the utterance and decide whether to claim it. Nothing
         else: no search, no speech, no waiting.
@@ -613,7 +657,8 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         "continue" and "pause" are declined rather than claimed when they
         make no sense for THIS session - nothing to resume, nothing being
         read - so a later pipeline stage gets its chance instead. Another
-        user's story on the same hub does not count."""
+        user's story on the same hub does not count. A request for the news
+        is declined the same way (see NEWS_VOC)."""
         container = self._get_intent_container(lang)
         session_id = _session_id(message)
         for utterance in utterances:
@@ -633,6 +678,8 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
                 # decline-rather-than-claim reasoning as "continue" above
                 continue
             entities = result.get("entities") or {}
+            if self._asks_for_news(entities, lang):
+                continue
 
             # match_data=entities (not the default None) is not
             # optional: a real crash found via live testing.
