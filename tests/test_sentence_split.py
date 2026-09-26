@@ -81,3 +81,19 @@ def test_an_old_bookmark_moves_to_the_first_word_not_yet_heard():
     assert migrate_bookmark(paragraphs, 1) == 0
     assert migrate_bookmark(paragraphs, 0) == 0
     assert migrate_bookmark(paragraphs, 4) == 3
+
+
+@pytest.mark.parametrize("text, expected", [
+    # the usual Danish spelling, no space between the initials
+    ("H.C. Andersen skrev det i 1835. Det blev trykt.",
+     ["H.C. Andersen skrev det i 1835.", "Det blev trykt."]),
+    ("Eventyret er af H.C. Andersen. Det er kort.",
+     ["Eventyret er af H.C. Andersen.", "Det er kort."]),
+    ("J.R.R. Tolkien wrote it. It is long.",
+     ["J.R.R. Tolkien wrote it.", "It is long."]),
+    # the spaced spelling keeps working
+    ("H. C. Andersen skrev det. Det blev trykt.",
+     ["H. C. Andersen skrev det.", "Det blev trykt."]),
+])
+def test_dotted_initials_do_not_end_a_sentence(text, expected):
+    assert split_sentences(text) == expected
