@@ -62,6 +62,7 @@ import time
 import unicodedata
 from os.path import dirname
 from typing import Dict, List, Optional, Union
+from xml.sax.saxutils import escape as xml_escape
 
 from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message, dig_for_message
@@ -70,6 +71,7 @@ from ovos_bus_client.util import get_message_lang
 from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
 from ovos_utils.fakebus import FakeBus
 from ovos_workshop.app import OVOSAbstractApplication
+from ovos_workshop.skills import ovos as _workshop_skill
 from padacioso import IntentContainer
 
 
@@ -301,6 +303,86 @@ def spoken_wait(text: str, chars_per_second: float = SPOKEN_CHARS_PER_SECOND,
     `15 if isinstance(wait, bool) else wait`, which takes either."""
     seconds = len(text) / chars_per_second + margin
     return max(1, min(MAX_SPOKEN_WAIT, math.ceil(seconds)))
+
+
+# --- narration (#40) ------------------------------------------------------
+#
+# Off unless the plugin's config or settings say {"narration": "ssml"}. Each
+# sentence then carries an SSML version of itself in data["utterance_ssml"],
+# beside the plain data["utterance"], which stays exactly as it was. Never
+# inline: a client that doesn't render SSML shows or says a tag it finds in
+# "utterance", while one that doesn't know "utterance_ssml" just ignores it.
+# Every sentence is still its own speak and its own <speak> document, so the
+# bookmark and the wait work as before.
+#
+# The rules are few, because a pause in the wrong place is worse than none,
+# and they only act on what the text itself marks:
+#
+# - a pause before the first sentence read (after "Here it is: ..." or
+#   "Continuing ...") and a shorter one before the first sentence of every
+#   other paragraph;
+# - a dash right after the end of a sentence, which is how Cosquin's
+#   Gutenberg text marks the next speaker ("maltraité?—Si tu te plains"),
+#   becomes a pause longer than the voice's own between two sentences;
+# - any other dash between words (an aside, an interruption: "I think—I know
+#   I think—it might be little Kay") becomes a brief pause. Phoonnx voices
+#   read straight through a dash, and through a comma too: their phonemizer
+#   drops both;
+# - "…" becomes "...": Phoonnx ends a sentence at "..." (80-130 ms of
+#   silence measured) and reads straight through the single character. An
+#   ellipsis with more of the sentence after it also gets a short pause.
+#
+# Quoted dialogue, "!" and "?" are left to the voice.
+NARRATION_SSML = "ssml"
+STORY_START_BREAK_MS = 750
+PARAGRAPH_BREAK_MS = 500
+SPEAKER_CHANGE_BREAK_MS = 300
+ELLIPSIS_BREAK_MS = 250
+DASH_BREAK_MS = 200
+# Every topic speak() has emitted on: "speak" up to ovos-workshop 8, then
+# SpecMessage.SPEAK ("ovos.utterance.speak"; the bus adds the legacy "speak"
+# twin unless OVOS_BUS_EMIT_LEGACY is off). Taken from the name speak() itself
+# looks up, so the narrated sentences go out on the same topic as plain ones.
+SPEAK_TOPIC = getattr(getattr(_workshop_skill, "SpecMessage", None), "SPEAK", "speak")
+
+_OPENERS = "\"'“‘«„»("
+# a dash after a sentence's end (and any closing quote): the next speaker
+_SPEAKER_DASH = re.compile(r"(?<=[.!?…])([" + re.escape(_CLOSERS) + r"]*)\s*(?:—|--|–)\s*(?=\S)")
+# an em dash or a double hyphen anywhere, an en dash only with a space on
+# either side (unspaced, it is a range: 1805–1812), and the closing quotes
+# right after it
+_ASIDE_DASH = re.compile(r"(?:\s*(?:—|--)\s*|\s+–\s+)([" + re.escape(_CLOSERS) + r"]*)\s*")
+_ELLIPSIS = re.compile(r"\.{3,}|…")
+# ...with more of the sentence after it, not a closing quote or the end
+_ELLIPSIS_MID = re.compile(r"\.\.\.\s+(?=[\w" + re.escape(_OPENERS) + r"])")
+# what XML 1.0 cannot carry at all, even escaped
+_NOT_XML = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
+
+
+def _break(ms: int) -> str:
+    return f'<break time="{ms}ms"/>'
+
+
+def _aside(match) -> str:
+    """A dash between words becomes a brief pause, after any closing quote
+    that follows it. One at either end of the sentence, or between two
+    numbers, is left as it is."""
+    text, start, end = match.string, match.start(), match.end()
+    if start == 0 or end == len(text) or (text[start - 1].isdigit() and text[end].isdigit()):
+        return match.group(0)
+    return f"{match.group(1)} {_break(DASH_BREAK_MS)} "
+
+
+def narrate(sentence: str, pause_before_ms: int = 0) -> str:
+    """One sentence as an SSML document (see the rules above). The words are
+    the sentence's own, XML-escaped; only dashes and ellipses change."""
+    text = xml_escape(_NOT_XML.sub("", sentence))
+    text = _SPEAKER_DASH.sub(lambda m: f"{m.group(1)} {_break(SPEAKER_CHANGE_BREAK_MS)} ", text)
+    text = _ASIDE_DASH.sub(_aside, text)
+    text = _ELLIPSIS.sub("...", text)
+    text = _ELLIPSIS_MID.sub(f"... {_break(ELLIPSIS_BREAK_MS)} ", text)
+    lead = _break(pause_before_ms) if pause_before_ms > 0 else ""
+    return f"<speak>{lead}{text}</speak>"
 
 
 def migrate_bookmark(paragraphs: List[str], legacy_index: int) -> int:
@@ -1028,6 +1110,34 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
                            self._positive_option("chars_per_second", SPOKEN_CHARS_PER_SECOND),
                            self._positive_option("wait_margin", SPOKEN_WAIT_MARGIN, allow_zero=True))
 
+    def _narrating(self) -> bool:
+        """Whether stories are read with SSML beside the text (#40): the
+        "narration" option set to "ssml" (see _option). Off by default."""
+        return str(self._option("narration", "") or "").strip().lower() == NARRATION_SSML
+
+    def _speak_ssml(self, utterance: str, ssml: str, wait: Union[bool, int] = False):
+        """speak(utterance, wait=wait), with data["utterance_ssml"] = ssml.
+
+        ovos-workshop's speak() builds its message itself and takes no extra
+        data, so this is its code with that one field added: the same topic
+        (SPEAK_TOPIC), data and meta, forwarded from the same message
+        (dig_for_message() finds the reader's `message` a frame or two up,
+        as it does for speak()), the plugin's skill_id in the context, and
+        the same wait. tests/test_narration.py checks the message against
+        speak()'s on the installed ovos-workshop."""
+        meta = {"skill": self.skill_id}
+        data = {"utterance": utterance, "expect_response": False, "meta": meta, "lang": self.lang,
+                "utterance_ssml": ssml}
+        message = dig_for_message()
+        m = message.forward(SPEAK_TOPIC, data) if message else Message(SPEAK_TOPIC, data)
+        m.context["skill_id"] = self.skill_id
+        self.bus.emit(m)
+        if wait:
+            timeout = 15 if isinstance(wait, bool) else wait
+            session = SessionManager.get(m)
+            session.is_speaking = True
+            SessionManager.wait_while_speaking(timeout, session)
+
     def _speak_dialog_and_wait(self, key: str, data: Optional[dict] = None):
         """speak_dialog(key, data, wait=True), with the wait sized to the
         line (#41) instead of a flat 15 s.
@@ -1238,7 +1348,13 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         # ran zero times, and _read_content immediately spoke the
         # 'finished_reading' dialog as if the (unheard) rest had been
         # read.
-        sentences = [s for para in paragraphs for s in split_sentences(para)]
+        sentences, paragraph_starts = [], set()
+        for para in paragraphs:
+            chunks = split_sentences(para)
+            if chunks:
+                paragraph_starts.add(len(sentences))
+            sentences.extend(chunks)
+        narrating = self._narrating()
 
         key = self._progress_key(candidate)
         # A bookmark saved before SPLITTER_VERSION counted chunks of the old
@@ -1255,7 +1371,12 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             # with every '.' replaced by a space - the full stop that ends
             # the sentence, "Mr. Fox", "3.5" - and a sentence that happens to
             # equal a dialog name would be swapped for that dialog.
-            self.speak(sentence, wait=self._spoken_wait(sentence))
+            if narrating:
+                pause = STORY_START_BREAK_MS if i == bookmark else \
+                    PARAGRAPH_BREAK_MS if i in paragraph_starts else 0
+                self._speak_ssml(sentence, narrate(sentence, pause), wait=self._spoken_wait(sentence))
+            else:
+                self.speak(sentence, wait=self._spoken_wait(sentence))
             # only marked done AFTER actually speaking it - if pause
             # sets the stop flag while this sentence is mid-speech,
             # speak(wait=...) still finishes it before returning, so

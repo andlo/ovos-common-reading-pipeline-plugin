@@ -98,6 +98,7 @@ when `mycroft.conf` doesn't set them:
 ```json
 "intents": {
   "ovos-common-reading-pipeline-plugin": {
+    "narration": "ssml",
     "chars_per_second": 14,
     "wait_margin": 3
   }
@@ -106,6 +107,7 @@ when `mycroft.conf` doesn't set them:
 
 | key | default | what it does |
 |---|---|---|
+| `narration` | off | `"ssml"` sends each sentence with an SSML version beside it (see [Narration](#narration)) |
 | `chars_per_second` | `14` | speaking rate the wait after each line is sized with (see below) |
 | `wait_margin` | `3` | seconds added to that wait, for synthesis |
 
@@ -144,6 +146,40 @@ a line starts playing and `recognizer_loop:audio_output_end` when it
 ends, with the session of the `speak` it came from in the context.
 That is what lets the story go on the moment a sentence ends; without
 it, the plugin can only guess how long each sentence takes.
+
+### Narration
+
+With `"narration": "ssml"`, every sentence of a story goes out with an
+SSML version of itself in `data["utterance_ssml"]`, beside the plain
+`data["utterance"]`, which is exactly what it would be without it. The
+SSML is never put in `utterance`: a client that doesn't render SSML
+would show or say the tags, while one that doesn't know
+`utterance_ssml` simply ignores it. Each sentence is still its own
+`speak` and its own `<speak>` document, so bookmarks and pacing are
+unchanged. It is off by default.
+
+The narrator only acts on what the text marks, and leaves the rest to
+the voice:
+
+- a 750 ms pause before the first sentence read (after the
+  announcement or "continue") and 500 ms before the first sentence of
+  every other paragraph (a provider that sends the whole story as one
+  paragraph gets none);
+- a dash right after the end of a sentence, the way Cosquin's text
+  marks the next speaker (`maltraité?—Si tu te plains`), becomes a
+  300 ms pause;
+- any other dash between words (`I think—I know I think—it might be
+  little Kay`) becomes a 200 ms pause; a dash between two numbers, or
+  at either end of the sentence, is left alone;
+- `…` is written `...`, which Phoonnx voices pause on and the single
+  character they read straight through, and an ellipsis in the middle
+  of a sentence gets a 250 ms pause.
+
+```xml
+<speak><break time="500ms"/>The eldest was proud <break time="200ms"/> far too proud.</speak>
+```
+
+Quoted dialogue, `!` and `?` are left alone.
 
 ### The news is left to news skills
 
