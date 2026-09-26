@@ -86,6 +86,68 @@ currently relevant to, so this position - right after stop, ahead of
 everything else - is enough for `pause`/`continue` to reliably reach
 it without needing to jump the stop queue.
 
+The stage is the plain id `ovos-common-reading-pipeline-plugin` (no
+`-high`/`-medium`/`-low` tiers). ovos-core hands the plugin whatever is
+under `intents["ovos-common-reading-pipeline-plugin"]` in `mycroft.conf`;
+the plugin itself reads nothing from it today, but ovos-core does
+(`match_timeout`, default 10 s, and `match_workers`, default 4).
+
+### How a request is handled
+
+- `match()` only recognizes the utterance (padacioso, a few
+  milliseconds) and claims it or not. It never searches, speaks or
+  waits: ovos-core 3.7 gives each plugin's `match()` 10 s on a small
+  worker pool, and an utterance whose `match()` runs longer falls
+  through to the later pipeline stages.
+- ovos-core then dispatches `<skill_id>:<intent>`
+  (`ovos-common-reading-pipeline-plugin.andlo:read_content`,
+  `:read_by_collection`, `:read_by_type`, `:read_any_story`,
+  `:continue`, `:pause`) to the handler the plugin registered for it.
+  The handler searches the providers, asks "is it that one?" when the
+  best match is unsure, announces the story, starts reading it and
+  returns. That return is what ends the turn
+  (`mycroft.skill.handler.complete`, then `ovos.utterance.handled`),
+  about two seconds after the request (the search window), so "stop",
+  "pause" and anything else reach the assistant while the story plays.
+- The story is read on a background thread, one sentence at a time.
+  Each sentence is forwarded from the request that started the story,
+  so it carries that request's session and route, and each waits for
+  that session's `recognizer_loop:audio_output_end` before the next one
+  goes out. A client that reports its playback paces the story; one
+  that doesn't is waited on for up to 15 s per sentence (see
+  [#41](https://github.com/andlo/ovos-common-reading-pipeline-plugin/issues/41)).
+
+### Several users at once (HiveMind hubs)
+
+On a HiveMind hub every connected client talks to the same ovos-core,
+and so to the same instance of this plugin. Everything a story needs is
+kept per session (the `session_id` in the message context): whether it
+is being read, what "continue" resumes and where, and the stop flag.
+One user's "stop", "pause" or "continue" only ever touches their own
+story. A stop that names no session at all (the plugin shutting down)
+stops every story.
+
+Bookmarks live in the plugin's settings file, per session:
+
+```json
+{
+  "sessions": {
+    "<session_id>": {
+      "last_content": {"skill_id": "...", "content_id": "...", "title": "..."},
+      "last_lang": "fr-FR",
+      "progress": {"<skill_id>::<content_id>": 12},
+      "progress_splitter": {"<skill_id>::<content_id>": 2},
+      "touched": 1790000000.0
+    }
+  }
+}
+```
+
+The 50 most recently used sessions are kept, plus `default` and any
+session reading right now. Settings from earlier versions (a single
+`last_content`/`progress` at the top level) are moved to the `default`
+session on start, so a paused story on a single device still continues.
+
 ### A separate, unresolved issue: "stop" itself may not reach this plugin at all
 
 This is **not** a pipeline-ordering problem, and moving this plugin
@@ -140,9 +202,21 @@ ovos.common_reading.search
   "phrase": "<what the user asked for, or null for 'surprise me'>",
   "collection_hint": "<raw text like 'grimm' or 'h c andersen', or null>",
   "content_type": "<raw hint like 'story', 'book', 'article', 'poem', or null>",
+  "lang": "<the language the request was made in, e.g. 'fr-FR'>",
   "requester": "<this plugin's id>"
 }
 ```
+
+The search (like the fetch and the ping below) is forwarded from the
+user's request, so its context carries the requesting session and route.
+**Answer with `message.reply(...)`**: that keeps the session on the
+answer, and the plugin only takes answers for the session that asked
+(two users can search at the same moment on a hub).
+
+`lang` is the language ovos-core matched the request in. Answer in that
+language, or not at all; don't take the language from the session
+instead (for the `default` session, `SessionManager.get()` returns the
+device's own language whatever the message carried).
 
 `collection_hint` is set when the user names a specific source/collection
 ("read me a story **from Grimm**", "find Cinderella **by Andersen**"). It's
@@ -158,6 +232,15 @@ can compete".
 `phrase` can also be null on its own - "read me a story from Grimm" with
 no specific title named is a valid request for the hinted provider to
 offer something of its own choosing.
+
+"Tell me a story" ("raconte-moi une histoire", "erzähl mir ein
+Märchen", see `locale/<lang>/ReadAnyStory.intent`) sends `phrase` and
+`collection_hint` null and `content_type` `"story"`, whatever language it
+was said in. A story provider answers it with **one** story of its own
+choosing at confidence **0.9**: enough to be read without the "is it
+that one?" question, below the 1.0 of a title somebody named. When
+several providers answer, one of the equally confident answers is picked
+at random.
 
 Every provider that thinks it can help replies (within ~2s):
 
@@ -180,6 +263,16 @@ plugin confirms with the user before continuing). If a provider sets
 `"machine_translated": true`, that's disclosed as part of the
 announcement right before reading starts.
 
+`title`, `author`, `collection` and `source` are spoken as they are, in
+an announcement like "La Biche blanche, par Emmanuel Cosquin, tiré du
+recueil Contes populaires de Lorraine, source : Projet Gutenberg". The
+words around them come from this plugin's locale (`by_author.dialog`,
+`from_collection.dialog`, `sourced_from.dialog`,
+`machine_translated.dialog`), so give plain names ("Emmanuel Cosquin",
+not "collected by Emmanuel Cosquin"). `content_id` is only ever sent
+back to you, in the fetch, and keys the bookmark; it may differ from the
+title.
+
 ### 2. Fetch
 
 Once something is chosen (or resumed via "continue"), a *targeted*
@@ -187,10 +280,14 @@ request goes to just that provider:
 
 ```
 ovos.common_reading.fetch_content.<provider_skill_id>
-{"content_id": "<from the search response>", "requester": "<this plugin's id>"}
+{"content_id": "<from the search response>", "lang": "<the language it was found in>",
+ "requester": "<this plugin's id>"}
 ```
 
-The provider replies once with the full text, split into paragraphs:
+`lang` is the language of the search the story came from, also when
+"continue" was said in another language. The provider replies once,
+with `message.reply(...)` (only the answer for the requesting session is
+taken), with the full text, split into paragraphs:
 
 ```
 ovos.common_reading.fetch_content.response
@@ -206,9 +303,9 @@ Reading checks a break condition between every sentence (not just
 between paragraphs), so an interruption takes effect within a sentence
 or so, not at the end of a whole paragraph. Two ways to interrupt:
 
-- **"stop"** - handled via `stop()`, the standard OVOS mechanism
-  triggered by the platform's own global stop command/button. Not
-  specific to this plugin's own vocabulary.
+- **"stop"** - handled via `stop_session()`, the standard OVOS mechanism
+  triggered by the platform's own stop command/button, for the session
+  that said it. Not specific to this plugin's own vocabulary.
 - **"pause"** - a dedicated intent this plugin matches itself (see
   `locale/<lang>/pause.intent`), rather than relying on "pause" being
   recognized as a synonym for "stop" at the OVOS core level, which
@@ -217,9 +314,10 @@ or so, not at the end of a whole paragraph. Two ways to interrupt:
   ("say continue when you're ready") instead of sounding final.
 
 Either way, progress is bookmarked automatically - saying **"continue"**
-later picks up from the same paragraph, even after a full restart,
+later picks up from the same sentence, even after a full restart,
 since the bookmark and the last-read content are both stored in
-persistent skill settings, not just in memory.
+persistent skill settings, not just in memory. All three only act on
+the session that said them.
 
 ### 3. Ping (only used when a search comes up empty)
 
@@ -232,8 +330,11 @@ is worse than just asking. So it asks:
 
 ```
 ovos.common_reading.ping
-{"requester": "<this plugin's id>"}
+{"lang": "<the language the request was made in>", "requester": "<this plugin's id>"}
 ```
+
+A provider only answers a ping in a language it serves, with
+`message.reply(...)`.
 
 Every provider that's loaded and listening should reply, cheaply, with
 no index lookup:

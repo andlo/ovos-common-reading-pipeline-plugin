@@ -399,6 +399,85 @@ READ_CONTENT_BY_TYPE = {
     ],
 }
 
+# "Tell me a story" and nothing more - no title, no collection, no
+# "my"/"today's". The plugin sends the search with phrase=None and
+# content_type "story", and each story provider offers one story of its own
+# choosing (see README's search section). Its own intent rather than a
+# ReadContentByType line: a "{content_type}" wildcard after "a" would also
+# swallow "a story about cinderella" and "a story from grimm", where
+# read_content and read_by_collection must win.
+#
+# The nouns are story words only ("story", "tale", "fairy tale", and each
+# language's own), never article/news/document, so "read the news" or
+# "read me an article" is never taken for "any story". Every line is fully
+# literal (no wildcard), so padacioso scores an exact hit 1.0, above the
+# 0.96 of "tell me a {collection} story" for "tell me a fairy tale".
+#
+# French, Portuguese: the hyphenated imperative ("Raconte-moi", "Conta-me")
+# comes out of some STT engines without the hyphen, and padacioso matches
+# them as different words, so both spellings are listed. "-nous"/"uns"/"ons"
+# forms because a story is often asked for on behalf of children.
+STORY_NOUNS = {
+    "en-us": "(a story|a tale|a fairy tale|a fairytale|a bedtime story|another story|another tale|another fairy tale)",
+    "da-dk": "(en historie|et eventyr|en godnathistorie|en anden historie|et andet eventyr)",
+    "de-de": "(eine Geschichte|ein Märchen|eine Gutenachtgeschichte|noch eine Geschichte|noch ein Märchen)",
+    "es-es": "(un cuento|una historia|otro cuento|otra historia|un cuento para dormir)",
+    "fr-fr": "(une histoire|un conte|un conte de fées|une autre histoire|un autre conte|une histoire pour dormir)",
+    "it-it": "(una storia|una fiaba|una favola|un'altra storia|un'altra fiaba|una storia della buonanotte)",
+    "nl-nl": "(een verhaal|een verhaaltje|een sprookje|nog een verhaal|nog een sprookje)",
+    "pt-pt": "(uma história|um conto|outra história|outro conto|uma história para dormir)",
+}
+READ_ANY_STORY = {
+    "en-us": [
+        f"{VERB_ME['en-us']} {STORY_NOUNS['en-us']}",
+        f"{VERB_ME['en-us']} {STORY_NOUNS['en-us']} please",
+    ],
+    "da-dk": [
+        f"{VERB_ME_DA} {STORY_NOUNS['da-dk']}",
+        f"{VERB_BARE_DA} {STORY_NOUNS['da-dk']} for mig",
+        f"(Læs|Kan du læse|Kunne du læse|Vil du læse) {STORY_NOUNS['da-dk']} op for mig",
+    ],
+    "de-de": [
+        f"(Erzähl mir|Erzähle mir|Erzähl uns|Erzähle uns|Erzähl|Erzähle) {STORY_NOUNS['de-de']}",
+        f"(Erzähl mir|Erzähle mir|Erzähl uns|Erzähle uns) bitte {STORY_NOUNS['de-de']}",
+        f"(Lies mir|Lies uns|Lies) {STORY_NOUNS['de-de']} vor",
+        f"(Lies mir|Lies uns) bitte {STORY_NOUNS['de-de']} vor",
+        f"(Lies mir|Lies uns) {STORY_NOUNS['de-de']}",
+        f"(Kannst du|Könntest du|Würdest du) (mir|uns) {STORY_NOUNS['de-de']} (erzählen|vorlesen)",
+    ],
+    "es-es": [
+        f"(Cuéntame|Cuéntanos|Léeme|Léenos) {STORY_NOUNS['es-es']}",
+        f"(Cuéntame|Cuéntanos|Léeme|Léenos) {STORY_NOUNS['es-es']} por favor",
+        f"(Puedes|Podrías) (contarme|contarnos|leerme|leernos) {STORY_NOUNS['es-es']}",
+    ],
+    "fr-fr": [
+        f"(Raconte-moi|Raconte moi|Raconte-nous|Raconte nous|Raconte|Lis-moi|Lis moi|Lis-nous|Lis nous|Lis) "
+        f"{STORY_NOUNS['fr-fr']}",
+        f"(Raconte-moi|Raconte moi|Raconte-nous|Raconte nous|Lis-moi|Lis moi|Lis-nous|Lis nous) "
+        f"{STORY_NOUNS['fr-fr']} (s'il te plaît|s'il vous plaît)",
+        f"(Racontez-moi|Racontez moi|Racontez-nous|Racontez nous|Lisez-moi|Lisez moi|Lisez-nous|Lisez nous) "
+        f"{STORY_NOUNS['fr-fr']}",
+        f"(Tu peux|Tu pourrais|Peux-tu|Peux tu|Pourrais-tu|Pourrais tu|Vous pouvez|Pouvez-vous|Pouvez vous|"
+        f"Pourriez-vous|Pourriez vous) (me|nous) (raconter|lire) {STORY_NOUNS['fr-fr']}",
+    ],
+    "it-it": [
+        f"(Raccontami|Raccontaci|Leggimi|Leggici) {STORY_NOUNS['it-it']}",
+        f"(Raccontami|Raccontaci|Leggimi|Leggici) {STORY_NOUNS['it-it']} per favore",
+        f"(Puoi|Potresti) (raccontarmi|raccontarci|leggermi|leggerci) {STORY_NOUNS['it-it']}",
+    ],
+    "nl-nl": [
+        f"(Vertel me|Vertel mij|Vertel ons|Vertel) {STORY_NOUNS['nl-nl']}",
+        f"(Lees me|Lees mij|Lees ons) {STORY_NOUNS['nl-nl']} voor",
+        f"(Lees me|Lees mij|Lees ons) {STORY_NOUNS['nl-nl']}",
+        f"(Kun je|Kan je|Wil je) (me|mij|ons) {STORY_NOUNS['nl-nl']} (vertellen|voorlezen)",
+    ],
+    "pt-pt": [
+        f"(Conta-me|Conta me|Conta-nos|Conta nos|Lê-me|Lê me|Lê-nos|Lê nos) {STORY_NOUNS['pt-pt']}",
+        f"(Conta-me|Conta me|Lê-me|Lê me) {STORY_NOUNS['pt-pt']} por favor",
+        f"(Podes|Podias) (contar-me|contar-nos|ler-me|ler-nos) {STORY_NOUNS['pt-pt']}",
+    ],
+}
+
 # KNOWN LIMITATION (pre-existing, not introduced by the above additions
 # - confirmed via live testing): combining BOTH a title AND a collection
 # in one utterance ("tell me the story about the little mermaid from
@@ -546,7 +625,10 @@ for lang, lines in READ_BY_COLLECTION.items():
     (ROOT / lang / "ReadContentByCollection.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
 for lang, lines in READ_CONTENT_BY_TYPE.items():
     (ROOT / lang / "ReadContentByType.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
+for lang, lines in READ_ANY_STORY.items():
+    (ROOT / lang / "ReadAnyStory.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
 for lang, lines in CONTINUE.items():
     (ROOT / lang / "continue.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-print("Rewrote ReadContent.intent, ReadContentByCollection.intent, ReadContentByType.intent (en-us/da-dk only), continue.intent")
+print("Rewrote ReadContent.intent, ReadContentByCollection.intent, ReadContentByType.intent (en-us/da-dk only), "
+      "ReadAnyStory.intent, continue.intent")

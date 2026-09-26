@@ -7,7 +7,7 @@
   "author": "andlo",
   "name": "Allgemeine Vorlese-Pipeline",
   "description": "Eine allgemeine Vorlese-Pipeline: erkennt Anfragen, Geschichten, Artikel und mehr vorzulesen, und leitet sie an das passende installierte Skill weiter.",
-  "examples": ["Erzähl mir eine Geschichte über Aschenputtel", "Erzähl mir eine Geschichte von grimm", "Weiter", "Pause"],
+  "examples": ["Erzähl mir ein Märchen", "Erzähl mir eine Geschichte über Aschenputtel", "Erzähl mir eine Geschichte von grimm", "Weiter", "Pause"],
   "tags": ["entertainment", "stories", "reading", "pipeline"],
   "icon": "https://raw.githubusercontent.com/andlo/ovos-common-reading-pipeline-plugin/main/book-512.png"
 }

@@ -7,7 +7,7 @@
   "author": "andlo",
   "name": "Generieke voorleespipeline",
   "description": "Een generieke voorleespipeline: herkent verzoeken om verhalen, artikelen en meer voor te lezen, en stuurt ze door naar de geïnstalleerde skill die die inhoud kan leveren.",
-  "examples": ["Vertel me een verhaal over assepoester", "Vertel me een verhaal van grimm", "Ga verder", "Pauze"],
+  "examples": ["Vertel me een sprookje", "Vertel me een verhaal over assepoester", "Vertel me een verhaal van grimm", "Ga verder", "Pauze"],
   "tags": ["entertainment", "stories", "reading", "pipeline"],
   "icon": "https://raw.githubusercontent.com/andlo/ovos-common-reading-pipeline-plugin/main/book-512.png"
 }
