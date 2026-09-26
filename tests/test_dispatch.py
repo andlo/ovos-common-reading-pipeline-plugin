@@ -48,8 +48,7 @@ class Recorder:
             return [(t, m) for t, m in self.messages if m.msg_type == msg_type]
 
 
-@pytest.fixture
-def live(tmp_path, monkeypatch):
+def _start(tmp_path, monkeypatch, sentences=SENTENCES, reports_playback=True):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     real_sleep = time.sleep
     # the 2 s search window is a plain sleep; a FakeBus provider answers at once
@@ -74,12 +73,27 @@ def live(tmp_path, monkeypatch):
             "author": "Andrew Lang", "source": "Project Gutenberg", "confidence": 0.95}))
 
     def fetch(message):
-        bus.emit(message.reply(COMMON_READING_FETCH_CONTENT_RESPONSE, {"paragraphs": [" ".join(SENTENCES)]}))
+        bus.emit(message.reply(COMMON_READING_FETCH_CONTENT_RESPONSE, {"paragraphs": [" ".join(sentences)]}))
 
-    bus.on("speak", audio)
+    if reports_playback:
+        bus.on("speak", audio)
     bus.on(COMMON_READING_SEARCH, search)
     bus.on(f"{COMMON_READING_FETCH_CONTENT}.{PROVIDER}", fetch)
-    plugin = CommonReadingPipeline(bus=bus)
+    return CommonReadingPipeline(bus=bus), bus
+
+
+@pytest.fixture
+def live(tmp_path, monkeypatch):
+    plugin, bus = _start(tmp_path, monkeypatch)
+    yield plugin, bus
+    plugin.stop()
+
+
+@pytest.fixture
+def quiet(tmp_path, monkeypatch):
+    """A client that plays what it is sent and never says so: no
+    audio_output_start/end at all (#41)."""
+    plugin, bus = _start(tmp_path, monkeypatch, sentences=SENTENCES[:5], reports_playback=False)
     yield plugin, bus
     plugin.stop()
 
@@ -220,3 +234,44 @@ def test_two_sessions_read_side_by_side_and_stop_separately(live):
 
     assert heard("bob") == SENTENCES
     assert 0 < len(heard("alice")) < len(SENTENCES)
+
+
+def test_a_client_that_never_reports_playback_waits_each_sentence_its_own_length(quiet):
+    """#41: nothing answers the speaks. Each sentence is waited on for as
+    long as it takes to say, not for wait=True's 15 s: five sentences take
+    about the sum of their sized waits instead of 75 s. The rate is turned
+    up here so every wait is the 1 s floor and the test stays short."""
+    plugin, bus = quiet
+    plugin.config = {"chars_per_second": 1000, "wait_margin": 0}
+    speaks = Recorder(bus, "speak")
+
+    _dispatch(plugin, bus, "alice", "read_content", {"title": "rapunzel"})
+    reader = plugin._readings["alice"].thread
+    reader.join(30)
+
+    assert not reader.is_alive()
+    story = [(t, m.data["utterance"]) for t, m in speaks.of("speak") if m.data["utterance"] in SENTENCES]
+    assert [u for _, u in story] == SENTENCES[:5]
+    waits = [plugin._spoken_wait(u) for _, u in story]
+    assert waits == [1] * 5
+    gaps = [b - a for (a, _), (b, _) in zip(story, story[1:])]
+    assert all(0.9 < gap < 1.5 for gap in gaps), gaps
+
+
+def test_a_client_that_reports_playback_still_sets_the_pace(live):
+    """The sized wait is only the longest the reader waits: each sentence
+    goes out as soon as the previous one's audio_output_end arrives. Twenty
+    sentences sized at 6 s each are read in a second or two."""
+    plugin, bus = live
+    events = Recorder(bus, "speak", "recognizer_loop:audio_output_end")
+
+    _dispatch(plugin, bus, "alice", "read_content", {"title": "rapunzel"})
+    plugin._readings["alice"].thread.join(60)
+
+    story = [t for t, m in events.of("speak") if m.data["utterance"] in SENTENCES]
+    ends = [t for t, _ in events.of("recognizer_loop:audio_output_end")]
+    assert len(story) == len(SENTENCES)
+    assert sum(plugin._spoken_wait(s) for s in SENTENCES) >= 100
+    for spoken, following in zip(story, story[1:]):
+        end = min(t for t in ends if t > spoken)
+        assert end < following < end + 0.5

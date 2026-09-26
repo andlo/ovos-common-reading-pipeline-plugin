@@ -20,6 +20,7 @@ from conftest import (
 def _wire_common_mocks(plugin):
     plugin.speak = MagicMock()
     plugin.speak_dialog = MagicMock()
+    plugin._speak_dialog_and_wait = MagicMock()
     plugin.ask_yesno = MagicMock(return_value="yes")
 
 
@@ -172,7 +173,7 @@ def test_continue_handler_resumes_from_the_bookmark(plugin):
 
     plugin.handle_continue(message)
 
-    plugin.speak_dialog.assert_called_once_with('continue', data={"title": "Cinderella"}, wait=True)
+    plugin._speak_dialog_and_wait.assert_called_once_with('continue', data={"title": "Cinderella"})
     (sent, reading, bookmark), _ = plugin._read_in_background.call_args
     assert (sent, reading.candidate, bookmark) == (message, candidate, 7)
 
@@ -187,6 +188,7 @@ def test_continue_while_already_reading_does_not_start_a_second_reader(plugin):
 
     plugin._read_in_background.assert_not_called()
     plugin.speak_dialog.assert_not_called()
+    plugin._speak_dialog_and_wait.assert_not_called()
 
 
 def test_stop_while_reading_speaks_and_returns_true(plugin):
@@ -197,11 +199,11 @@ def test_stop_while_reading_speaks_and_returns_true(plugin):
 
     assert result is True
     assert plugin._is_reading("default") is False
-    # wait=True is required, not optional - see the comment on
+    # Waiting on it is required, not optional - see the comment on
     # stop_session() in __init__.py. Without it, this confirmation was
     # silently getting flushed by OVOS core's own global stop handling
     # before ever reaching the speaker - a real bug found in manual testing.
-    plugin.speak_dialog.assert_called_once_with('stop_reading', wait=True)
+    plugin._speak_dialog_and_wait.assert_called_once_with('stop_reading')
 
 
 def test_stop_while_not_reading_returns_false(plugin):
@@ -209,6 +211,7 @@ def test_stop_while_not_reading_returns_false(plugin):
 
     assert plugin.stop() is False
     plugin.speak_dialog.assert_not_called()
+    plugin._speak_dialog_and_wait.assert_not_called()
 
 
 def test_match_pause_with_nothing_being_read_declines(plugin):
@@ -238,8 +241,8 @@ def test_pause_while_reading_stops_and_speaks_paused_dialog(plugin):
     plugin.handle_pause(dispatch_message(intent="pause"))
 
     assert plugin._is_reading("default") is False
-    # wait=True is required, not optional - same reasoning/bug as stop()
-    plugin.speak_dialog.assert_called_once_with('paused', wait=True)
+    # waiting is required, not optional - same reasoning/bug as stop()
+    plugin._speak_dialog_and_wait.assert_called_once_with('paused')
 
 
 def test_pause_then_continue_resumes_from_the_bookmark(plugin):
@@ -271,8 +274,8 @@ def test_pause_then_continue_resumes_from_the_bookmark(plugin):
 
 
 def test_low_confidence_confirmation_speaks_with_wait_before_asking(plugin):
-    """Real bug fixed here: 'that_would_be' MUST be spoken with
-    wait=True before ask_yesno() opens its listening window - without
+    """Real bug fixed here: 'that_would_be' MUST be spoken and waited
+    on before ask_yesno() opens its listening window - without
     it, the window opens (and can time out) while the confirmation
     question is still queued/playing, not synced to when the user
     could actually have heard it and started answering. Reported
@@ -284,15 +287,14 @@ def test_low_confidence_confirmation_speaks_with_wait_before_asking(plugin):
     ])
     plugin._announce_and_read = MagicMock()
     call_order = []
-    plugin.speak_dialog.side_effect = lambda *a, **kw: call_order.append(("speak", a, kw))
+    plugin._speak_dialog_and_wait.side_effect = lambda *a, **kw: call_order.append(("speak", a, kw))
     plugin.ask_yesno.side_effect = lambda *a, **kw: call_order.append(("ask", a, kw)) or "yes"
 
     plugin._search_and_read(dispatch_message(), "cinderella")
 
     speak_call = next(c for c in call_order if c[0] == "speak")
     assert speak_call[1][0] == "that_would_be"
-    assert speak_call[2].get("wait") is True
-    # and it must have happened BEFORE ask_yesno, not just with wait=True
+    # and it must have happened BEFORE ask_yesno, not just been waited on
     assert call_order.index(speak_call) < next(i for i, c in enumerate(call_order) if c[0] == "ask")
 
 
@@ -401,7 +403,7 @@ def test_a_stop_during_the_announcement_stops_the_story(plugin):
             assert plugin.can_stop(session_message()) is True
             assert plugin.stop_session(module.SessionManager.get(session_message())) is True
 
-    plugin.speak_dialog.side_effect = stop_while_announcing
+    plugin._speak_dialog_and_wait.side_effect = stop_while_announcing
 
     plugin._announce_and_read(dispatch_message(), {"skill_id": "p", "content_id": "c", "title": "T"}, 0)
 
@@ -454,16 +456,16 @@ def test_stop_deactivates(plugin):
 
 def test_stop_sets_the_stop_flag_before_speaking_the_confirmation(plugin):
     """Real race condition found via live testing: with the flag set
-    AFTER speak_dialog('stop_reading', wait=True) instead of before,
-    there's a window where the reading loop's own thread (blocked in its
-    own wait=True call for whatever sentence is currently playing) wakes
+    AFTER the 'stop_reading' confirmation was spoken and waited on instead
+    of before, there's a window where the reading loop's own thread (blocked
+    in its own wait for whatever sentence is currently playing) wakes
     up, sees it may go on (stop's own speak_dialog call hasn't returned
     yet - it's queued behind that same sentence), and queues ONE MORE
     sentence before stop gets a chance to set the flag. Reported symptom:
     reading continued for one more sentence after saying "stop". This
     test asserts the ORDER directly via a side_effect that checks the
-    flag at the moment speak_dialog is actually called - it must already
-    be set by then."""
+    flag at the moment the confirmation is actually spoken - it must
+    already be set by then."""
     _wire_common_mocks(plugin)
     reading = plugin._begin_reading(session_message("alice"), {"skill_id": "p", "content_id": "c", "title": "T"})
     observed = {}
@@ -472,7 +474,7 @@ def test_stop_sets_the_stop_flag_before_speaking_the_confirmation(plugin):
         observed["stopped_at_speak_time"] = reading.stopped.is_set()
         observed["reading_at_speak_time"] = plugin._is_reading("alice")
 
-    plugin.speak_dialog.side_effect = fake_speak_dialog
+    plugin._speak_dialog_and_wait.side_effect = fake_speak_dialog
 
     plugin._handle_session_stop(session_message("alice", "mycroft.stop"))
 
