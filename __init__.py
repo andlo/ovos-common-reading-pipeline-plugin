@@ -128,6 +128,7 @@ _CLOSERS = "\"'”’»«“‘)]"
 _SENTENCE_END = re.compile(
     r"(?:\.{3}|[.!?…])+[" + re.escape(_CLOSERS) + r"]*(?:\s[»”’](?=\s))?(?=\s)"
 )
+_DOTTED_INITIALS = re.compile(r"(?:[^\W\d_]\.)+[^\W\d_]")
 _CLAUSE_BREAK = re.compile(r"[,;:](?=\s)|\s(?:--|—|–)(?=\s)")
 
 
@@ -149,6 +150,10 @@ def _ends_sentence(text: str, match) -> bool:
     # An initial ("H. C. Andersen") or an ordinal ("den 1. januar", "am 3. Mai");
     # a year ("In 1805. Then...") still ends its sentence.
     if len(word) == 1 and word.isalpha():
+        return False
+    # Dotted initials written without spaces ("H.C. Andersen", "J.R.R. Tolkien",
+    # "U.S."): the word before the final dot is letter-dot-letter.
+    if _DOTTED_INITIALS.fullmatch(word):
         return False
     if word.isdigit() and len(word) <= 2:
         return False
