@@ -25,7 +25,7 @@ def test_reads_every_sentence_across_multiple_paragraphs(plugin):
     plugin._read_content(candidate, bookmark=0)
 
     spoken = [c.args[0] for c in plugin.speak_dialog.call_args_list if c.args and c.args[0] != 'finished_reading']
-    assert spoken == ["First sentence", "Second sentence", "Third sentence"]
+    assert spoken == ["First sentence.", "Second sentence", "Third sentence"]
 
 
 def test_finishes_and_clears_bookmark_when_all_sentences_spoken(plugin):
@@ -72,7 +72,7 @@ def test_pausing_mid_single_large_paragraph_preserves_remaining_sentences(plugin
 
     assert plugin.settings['progress'][key] == 2  # exactly the 2 sentences actually heard
     spoken_so_far = [c.args[0] for c in plugin.speak_dialog.call_args_list]
-    assert spoken_so_far == ["Sentence one", "Sentence two"]
+    assert spoken_so_far == ["Sentence one.", "Sentence two."]
 
     # now resume from that bookmark - the remaining 3 sentences must
     # all be spoken, none skipped
@@ -83,7 +83,7 @@ def test_pausing_mid_single_large_paragraph_preserves_remaining_sentences(plugin
     plugin._read_content(candidate, bookmark=bookmark)
 
     resumed_spoken = [c.args[0] for c in plugin.speak_dialog.call_args_list if c.args[0] != 'finished_reading']
-    assert resumed_spoken == ["Sentence three", "Sentence four", "Sentence five"]
+    assert resumed_spoken == ["Sentence three.", "Sentence four.", "Sentence five"]
 
 
 def test_fetch_error_speaks_content_unavailable_and_stops_reading(plugin):
@@ -105,4 +105,36 @@ def test_bookmark_of_zero_starts_from_the_very_first_sentence(plugin):
     plugin._read_content(candidate, bookmark=0)
 
     spoken = [c.args[0] for c in plugin.speak_dialog.call_args_list if c.args[0] != 'finished_reading']
-    assert spoken == ["One", "Two", "Three"]
+    assert spoken == ["One.", "Two.", "Three"]
+
+
+def test_a_bookmark_from_the_old_splitter_resumes_where_the_words_left_off(plugin):
+    """A bookmark saved before SPLITTER_VERSION counted chunks of the old
+    '. ' split. "Mr. Fox" was two of those chunks and is part of one sentence
+    now, so the old index 2, read as a new index, would skip "He ran." --
+    the two old chunks heard were "Mr" and "Fox came home", so it must
+    resume at "He ran."."""
+    plugin.speak_dialog = MagicMock()
+    plugin._fetch_content = MagicMock(return_value=["Mr. Fox came home. He ran. The end"])
+    candidate = _candidate()
+    key = CommonReadingPipeline._progress_key(candidate)
+    plugin.settings['progress'][key] = 2  # old split: ["Mr", "Fox came home", "He ran", "The end"]
+
+    plugin._read_content(candidate, bookmark=2)
+
+    spoken = [c.args[0] for c in plugin.speak_dialog.call_args_list if c.args[0] != 'finished_reading']
+    assert spoken == ["He ran.", "The end"]
+
+
+def test_a_bookmark_from_this_splitter_is_used_as_it_is(plugin):
+    plugin.speak_dialog = MagicMock()
+    plugin._fetch_content = MagicMock(return_value=["Mr. Fox came home. He ran. The end"])
+    candidate = _candidate()
+    key = CommonReadingPipeline._progress_key(candidate)
+    plugin.settings['progress_splitter'] = {key: 2}
+
+    plugin._read_content(candidate, bookmark=1)
+
+    spoken = [c.args[0] for c in plugin.speak_dialog.call_args_list if c.args[0] != 'finished_reading']
+    assert spoken == ["He ran.", "The end"]
+    assert 'progress_splitter' in plugin.settings and key not in plugin.settings['progress_splitter']

@@ -32,6 +32,7 @@ locale/<lang>/.
 
 
 import os
+import re
 from os.path import dirname
 from typing import Dict, List, Optional, Union
 
@@ -83,6 +84,140 @@ INTENT_FILES = {
     "continue": "continue.intent",
     "pause": "pause.intent",
 }
+
+# Longest chunk handed to TTS in one speak_dialog(wait=True) call. That wait
+# gives up after 15s (ovos_bus_client's wait_while_speaking), and at 12-15
+# spoken characters a second a 160-character chunk stays well inside it. A
+# sentence longer than this is cut at a clause boundary instead (#35).
+MAX_SPOKEN_CHARS = 160
+# ...but not into shards: a cut never leaves a piece shorter than this.
+MIN_CLAUSE_CHARS = 40
+# Bumped whenever sentence splitting changes what a bookmark index points at,
+# so bookmarks written by an older splitter can be carried over (see
+# migrate_bookmark) instead of resuming a few sentences off.
+SPLITTER_VERSION = 2
+
+# A '.' after one of these is not the end of a sentence ("Mr. Fox", "z.B.").
+# Lower case, without the final dot. Deliberately no bare "no": "No." is a
+# whole sentence of dialogue far more often than an abbreviation of "number".
+_ABBREVIATIONS = {
+    # en
+    "mr", "mrs", "ms", "dr", "st", "jr", "sr", "prof", "rev", "gen", "capt", "lt",
+    "col", "mt", "vs", "etc", "e.g", "i.e", "vol", "ch", "fig", "approx",
+    # da
+    "hr", "fru", "frk", "bl.a", "f.eks", "osv", "dvs", "nr", "ca", "jf", "pga", "evt", "kl",
+    # de
+    "fr", "frl", "bzw", "z.b", "u.a", "usw", "vgl", "ggf", "bspw",
+    # fr
+    "m", "mm", "mme", "mlle", "ste", "p.ex", "cf",
+    # es / pt
+    "sra", "srta", "dra", "d", "vd", "ud", "uds", "p.ej", "v.ex",
+    # it
+    "sig", "sigg", "dott", "ecc",
+    # nl
+    "dhr", "mevr", "mw", "bijv", "enz", "o.a", "blz",
+}
+# What closes a quotation after its terminator. Danish and German close with
+# “ and « as often as English does with ” and » (»Hej!« sagde han, „Hilfe!“).
+_CLOSERS = "\"'”’»«“‘)]"
+# A terminator, any closing quotes or brackets after it, then the space
+# before the next sentence. French sets its closing quote off with a space
+# (« Bonjour ! » dit-il); a spaced » or ” counts as closing only when a space
+# follows it too, since an opening quote is always followed by its word
+# (Danish opens with »: Han gik. »Hej!« sagde hun.).
+_SENTENCE_END = re.compile(
+    r"(?:\.{3}|[.!?…])+[" + re.escape(_CLOSERS) + r"]*(?:\s[»”’](?=\s))?(?=\s)"
+)
+_CLAUSE_BREAK = re.compile(r"[,;:](?=\s)|\s(?:--|—|–)(?=\s)")
+
+
+def _ends_sentence(text: str, match) -> bool:
+    """Whether the terminator in `match` really ends a sentence."""
+    rest = text[match.end():].lstrip()
+    if not rest:
+        return True
+    # Dialogue attribution carries on the same sentence: '"Oh!" said she.'
+    if rest[0].islower():
+        return False
+    terminator = match.group(0).rstrip(_CLOSERS + " ")
+    if terminator != ".":
+        return True
+    word = text[:match.start()].split()[-1:] or [""]
+    word = word[0].lstrip("\"'“‘«„([").lower()
+    if word in _ABBREVIATIONS:
+        return False
+    # An initial ("H. C. Andersen") or an ordinal ("den 1. januar", "am 3. Mai");
+    # a year ("In 1805. Then...") still ends its sentence.
+    if len(word) == 1 and word.isalpha():
+        return False
+    if word.isdigit() and len(word) <= 2:
+        return False
+    return True
+
+
+def _cap_length(sentence: str, limit: int) -> List[str]:
+    """Cut a sentence longer than `limit` at clause boundaries (#35).
+
+    The cut goes at the last comma, semicolon, colon or dash that keeps the
+    piece within `limit` and at least MIN_CLAUSE_CHARS long; failing that, at
+    the last space. Every word is kept, in order.
+    """
+    pieces = []
+    while len(sentence) > limit:
+        cut = None
+        for match in _CLAUSE_BREAK.finditer(sentence, 0, limit + 1):
+            if match.end() >= MIN_CLAUSE_CHARS:
+                cut = match.end()
+        if cut is None:
+            cut = sentence.rfind(" ", MIN_CLAUSE_CHARS, limit + 1)
+        if cut <= 0:
+            break
+        pieces.append(sentence[:cut].strip())
+        sentence = sentence[cut:].strip()
+    if sentence:
+        pieces.append(sentence)
+    return pieces
+
+
+def split_sentences(text: str, limit: int = MAX_SPOKEN_CHARS) -> List[str]:
+    """Split a paragraph into chunks to speak one at a time.
+
+    Sentences end at '.', '!', '?', '…' or '...' (closing quotes stay with
+    their sentence), but not after an abbreviation, an initial or an ordinal,
+    and not when the next word goes on in lower case. Each keeps its own
+    punctuation, which is what gives a question its rising tone. A sentence
+    longer than `limit` is cut further at clause boundaries.
+    """
+    text = " ".join(str(text).split())
+    sentences, start = [], 0
+    for match in _SENTENCE_END.finditer(text):
+        if _ends_sentence(text, match):
+            sentences.append(text[start:match.end()].strip())
+            start = match.end()
+    if text[start:].strip():
+        sentences.append(text[start:].strip())
+    return [piece for sentence in sentences for piece in _cap_length(sentence, limit)]
+
+
+def migrate_bookmark(paragraphs: List[str], legacy_index: int) -> int:
+    """Carry a bookmark written by the old '. ' splitter over to this one.
+
+    The index counted chunks of the old split; the same number now points
+    somewhere else. Words are what both splits share, so the bookmark moves
+    to the chunk holding the first word not yet heard: at worst a sentence
+    is heard twice, never skipped.
+    """
+    old = [s for para in paragraphs for s in para.split('. ')]
+    heard = sum(len(chunk.split()) for chunk in old[:legacy_index])
+    index, counted = 0, 0
+    for para in paragraphs:
+        for chunk in split_sentences(para):
+            words = len(chunk.split())
+            if counted + words > heard:
+                return index
+            counted += words
+            index += 1
+    return index
 
 
 def pick_best_candidate(candidates):
@@ -494,9 +629,14 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         # ran zero times, and _read_content immediately spoke the
         # 'finished_reading' dialog as if the (unheard) rest had been
         # read.
-        sentences = [s for para in paragraphs for s in para.split('. ')]
+        sentences = [s for para in paragraphs for s in split_sentences(para)]
 
         key = self._progress_key(candidate)
+        # A bookmark saved before SPLITTER_VERSION counted chunks of the old
+        # split; carry it over by the words already heard.
+        versions = self.settings.setdefault('progress_splitter', {})
+        if bookmark and versions.get(key) != SPLITTER_VERSION:
+            bookmark = migrate_bookmark(paragraphs, bookmark)
         for i, sentence in enumerate(sentences[bookmark:], start=bookmark):
             if self.is_reading is False:
                 break
@@ -509,10 +649,12 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             # is_reading check (above) correctly stops before the one
             # after it.
             self.settings['progress'][key] = i + 1
+            versions[key] = SPLITTER_VERSION
 
         if self.is_reading is True:
             self.is_reading = False
             self._deactivate()
             self.settings['progress'].pop(key, None)
+            versions.pop(key, None)
             self.settings['last_content'] = None
             self.speak_dialog('finished_reading', data={"source": candidate.get("source") or "the source"})
