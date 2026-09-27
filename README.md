@@ -88,9 +88,26 @@ it without needing to jump the stop queue.
 
 The stage is the plain id `ovos-common-reading-pipeline-plugin` (no
 `-high`/`-medium`/`-low` tiers). ovos-core hands the plugin whatever is
-under `intents["ovos-common-reading-pipeline-plugin"]` in `mycroft.conf`;
-the plugin itself reads nothing from it today, but ovos-core does
-(`match_timeout`, default 10 s, and `match_workers`, default 4).
+under `intents["ovos-common-reading-pipeline-plugin"]` in `mycroft.conf`,
+and reads two keys from it itself (`match_timeout`, default 10 s, and
+`match_workers`, default 4). The plugin reads the keys below from the
+same place, or from its settings file
+(`~/.config/mycroft/skills/ovos-common-reading-pipeline-plugin.andlo/settings.json`)
+when `mycroft.conf` doesn't set them:
+
+```json
+"intents": {
+  "ovos-common-reading-pipeline-plugin": {
+    "chars_per_second": 14,
+    "wait_margin": 3
+  }
+}
+```
+
+| key | default | what it does |
+|---|---|---|
+| `chars_per_second` | `14` | speaking rate the wait after each line is sized with (see below) |
+| `wait_margin` | `3` | seconds added to that wait, for synthesis |
 
 ### How a request is handled
 
@@ -113,9 +130,20 @@ the plugin itself reads nothing from it today, but ovos-core does
   Each sentence is forwarded from the request that started the story,
   so it carries that request's session and route, and each waits for
   that session's `recognizer_loop:audio_output_end` before the next one
-  goes out. A client that reports its playback paces the story; one
-  that doesn't is waited on for up to 15 s per sentence (see
+  goes out. A client that reports its playback paces the story. One
+  that doesn't is waited on for as long as the sentence takes to say:
+  its length at `chars_per_second` plus `wait_margin`, rounded up to
+  whole seconds and never more than 15 s (see
   [#41](https://github.com/andlo/ovos-common-reading-pipeline-plugin/issues/41)).
+  The announcement and the other lines the plugin waits on are sized
+  the same way.
+
+**If you write a client** that plays speech itself (a HiveMind
+satellite, a phone app), send `recognizer_loop:audio_output_start` when
+a line starts playing and `recognizer_loop:audio_output_end` when it
+ends, with the session of the `speak` it came from in the context.
+That is what lets the story go on the moment a sentence ends; without
+it, the plugin can only guess how long each sentence takes.
 
 ### The news is left to news skills
 

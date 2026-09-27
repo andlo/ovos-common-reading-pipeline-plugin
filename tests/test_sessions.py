@@ -25,6 +25,7 @@ RAPUNZEL = {"skill_id": "prov.a", "content_id": "Rapunzel", "title": "Rapunzel",
 def _wire(plugin):
     plugin.speak = MagicMock()
     plugin.speak_dialog = MagicMock()
+    plugin._speak_dialog_and_wait = MagicMock()
     return plugin
 
 
@@ -55,7 +56,7 @@ def test_a_stop_from_one_session_leaves_the_other_reading(plugin):
     assert plugin._is_reading("alice") is False
     assert plugin._is_reading("bob") is True
     # the confirmation goes to the session that said stop
-    plugin.speak_dialog.assert_called_once_with('stop_reading', wait=True)
+    plugin._speak_dialog_and_wait.assert_called_once_with('stop_reading')
 
 
 def test_a_global_stop_from_an_idle_session_stops_nobody(plugin):
@@ -71,7 +72,7 @@ def test_a_global_stop_from_an_idle_session_stops_nobody(plugin):
 
     assert response.data["result"] is False
     assert plugin._is_reading("alice") and plugin._is_reading("bob")
-    plugin.speak_dialog.assert_not_called()
+    plugin._speak_dialog_and_wait.assert_not_called()
 
 
 def test_a_global_stop_stops_the_session_that_said_it(plugin):
@@ -95,7 +96,7 @@ def test_a_stop_naming_no_session_stops_every_story(plugin):
     plugin._handle_session_stop(module.Message("mycroft.stop"))
 
     assert not plugin._is_reading("alice") and not plugin._is_reading("bob")
-    assert plugin.speak_dialog.call_count == 2  # each session hears its own confirmation
+    assert plugin._speak_dialog_and_wait.call_count == 2  # each session hears its own confirmation
 
 
 def test_stop_during_shutdown_stops_every_story(plugin):
@@ -110,7 +111,7 @@ def test_stop_during_shutdown_stops_every_story(plugin):
 def test_the_global_stop_confirms_to_each_session_on_its_own_route(plugin, monkeypatch):
     """stop() speaks one confirmation per stopped story, forwarded from the
     request that started it, so each reaches its own client."""
-    plugin.speak_dialog = MagicMock(side_effect=lambda *a, **kw: routes.append(
+    plugin._speak_dialog_and_wait = MagicMock(side_effect=lambda *a, **kw: routes.append(
         module.dig_for_message().context["session"]["session_id"]))
     routes = []
     plugin._begin_reading(session_message("alice"), CINDERELLA)
@@ -209,6 +210,7 @@ def test_two_sessions_read_at_once_and_one_stops(plugin):
 
     plugin.speak = speak
     plugin.speak_dialog = MagicMock()
+    plugin._speak_dialog_and_wait = MagicMock()
     story = " ".join(f"Sentence {i} ends here." for i in range(1, 41))
     plugin._fetch_content = MagicMock(return_value=[story])
 

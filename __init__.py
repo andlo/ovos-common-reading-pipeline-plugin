@@ -53,6 +53,7 @@ touch another user's story.
 
 
 import inspect
+import math
 import os
 import random
 import re
@@ -155,13 +156,27 @@ DEFAULT_SESSION_ID = "default"
 # reading right now), so the settings file cannot grow without bound.
 MAX_REMEMBERED_SESSIONS = 50
 
-# Longest chunk handed to TTS in one speak(wait=True) call. That wait
-# gives up after 15s (ovos_bus_client's wait_while_speaking), and at 12-15
-# spoken characters a second a 160-character chunk stays well inside it. A
-# sentence longer than this is cut at a clause boundary instead (#35).
+# Longest chunk handed to TTS in one speak() call. The wait after it gives up
+# after 15s at most (MAX_SPOKEN_WAIT), and at 12-15 spoken characters a
+# second a 160-character chunk stays well inside it. A sentence longer than
+# this is cut at a clause boundary instead (#35).
 MAX_SPOKEN_CHARS = 160
 # ...but not into shards: a cut never leaves a piece shorter than this.
 MIN_CLAUSE_CHARS = 40
+# How long the reader waits for a line to be heard (#41). speak(wait=...)
+# waits for the session's recognizer_loop:audio_output_end, or for its
+# timeout. A client that reports its playback ends the wait when the line
+# ends; one that doesn't (a HiveMind client that plays speech itself and says
+# nothing, a web preview) used to cost the full 15 s of wait=True after every
+# sentence, most of it silence. The timeout is sized to the line instead: its
+# length at a slow speaking rate plus a margin for synthesis, never more than
+# those 15 s. Piper was measured at 19-20 characters a second from speak to
+# audio_output_end, synthesis included, so 14 leaves room for slower voices.
+# Both can be set in the plugin's config or settings (see _option):
+# "chars_per_second" and "wait_margin".
+SPOKEN_CHARS_PER_SECOND = 14
+SPOKEN_WAIT_MARGIN = 3  # seconds
+MAX_SPOKEN_WAIT = 15  # seconds, what speak(wait=True) waits
 # Bumped whenever sentence splitting changes what a bookmark index points at,
 # so bookmarks written by an older splitter can be carried over (see
 # migrate_bookmark) instead of resuming a few sentences off.
@@ -274,6 +289,20 @@ def split_sentences(text: str, limit: int = MAX_SPOKEN_CHARS) -> List[str]:
     return [piece for sentence in sentences for piece in _cap_length(sentence, limit)]
 
 
+def spoken_wait(text: str, chars_per_second: float = SPOKEN_CHARS_PER_SECOND,
+                margin: float = SPOKEN_WAIT_MARGIN) -> int:
+    """Seconds to wait for `text` to be heard when nothing reports that it
+    was: len(text) / chars_per_second + margin, rounded up, at most
+    MAX_SPOKEN_WAIT.
+
+    Whole seconds because ovos-workshop 0.1.0 to 0.1.2 read the wait as
+    `wait if isinstance(wait, int) else 15`, so a fraction there would still
+    wait 15 s. From 0.1.3 on (checked through 9.8.6a2) it is
+    `15 if isinstance(wait, bool) else wait`, which takes either."""
+    seconds = len(text) / chars_per_second + margin
+    return max(1, min(MAX_SPOKEN_WAIT, math.ceil(seconds)))
+
+
 def migrate_bookmark(paragraphs: List[str], legacy_index: int) -> int:
     """Carry a bookmark written by the old '. ' splitter over to this one.
 
@@ -336,7 +365,7 @@ class _Reading:
     `message` is the dispatch Message the story was asked for with. Every
     sentence is forwarded from it, so each one carries that session and its
     routing context back to the client that asked (a HiveMind hub routes on
-    it, and speak(wait=True) waits for that session's audio_output_end).
+    it, and speak(wait=...) waits for that session's audio_output_end).
     `lang` is the language the story was found in, which the fetch asks for.
     `stopped` is what stop/pause set; the reader checks it before every
     sentence."""
@@ -374,6 +403,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         self._intent_containers = {}  # locale folder name -> trained padacioso IntentContainer
         self._containers_lock = threading.Lock()
         self._news_words = {}  # locale folder name -> the phrases of its news.voc
+        self._rejected_options = set()  # (key, value) already warned about
 
     def _register_intent_handlers(self):
         """Register a handler for every match type match() can return.
@@ -764,7 +794,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
 
         The stop flag is set BEFORE the confirmation is spoken - a real,
         confirmed race condition, found via live testing: the reading loop
-        (on its own thread, blocked inside speak(sentence, wait=True) for
+        (on its own thread, blocked inside speak(sentence, wait=...) for
         whatever sentence is currently playing) and this method (called from
         a separate bus-event thread) both want to enqueue TTS around the same
         moment. With the flag set AFTER 'stop_reading' was spoken, there's a
@@ -773,20 +803,21 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         before this method gets a chance to set the flag - which is exactly
         the "still reads one sentence after 'stop'" behavior reported.
 
-        wait=True on the dialog itself is still not optional: without it,
+        Waiting on the dialog itself is still not optional: without it,
         speak_dialog() only enqueues the TTS request and returns
         immediately. 'stop' is very likely to also trigger OVOS core's own
         audio-stop handling in the same moment, which flushes the TTS queue -
         a just-enqueued, not-yet-started confirmation gets silently wiped out
-        by that flush. wait=True blocks until the dialog has actually
-        finished being spoken, so nothing can race it away.
+        by that flush. The wait blocks until the dialog has actually
+        finished being spoken (or for as long as it takes to say, see
+        _speak_dialog_and_wait), so nothing can race it away.
 
         The confirmation and the deactivation go to the stop message in
         flight, i.e. to the session that asked."""
         if self._stop_reading(session.session_id) is None:
             return False
         self._deactivate()
-        self.speak_dialog('stop_reading', wait=True)
+        self._speak_dialog_and_wait('stop_reading')
         self._store_settings()
         return True
 
@@ -818,7 +849,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         """Deactivate and say 'stop_reading' to the session `message` came
         from (a local named `message` is how speak() finds its context)."""
         self._deactivate(message)
-        self.speak_dialog('stop_reading', wait=True)
+        self._speak_dialog_and_wait('stop_reading')
 
     def _stop_reading(self, session_id: str) -> Optional[_Reading]:
         """Flag this session's story to stop before its next sentence. The
@@ -841,11 +872,11 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         resuming rather than sounding final. Only the session that said
         it is paused.
 
-        wait=True for the same reason as stop_session() - see the comment
-        there."""
+        It waits for the dialog for the same reason as stop_session() - see
+        the comment there."""
         if self._stop_reading(_session_id(message)) is not None:
             self._deactivate(message)
-        self.speak_dialog('paused', wait=True)
+        self._speak_dialog_and_wait('paused')
         self._store_settings()
 
     def _handle_continue(self, message: Message):
@@ -864,7 +895,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             # "continue" was said in: a one-language provider answers nothing else
             lang = entry.get("last_lang")
         reading = self._begin_reading(message, last, lang)  # before speaking: see _announce_and_read
-        self.speak_dialog('continue', data={"title": last["title"]}, wait=True)
+        self._speak_dialog_and_wait('continue', data={"title": last["title"]})
         self._read_in_background(message, reading, bookmark)
 
     # --- search and read -------------------------------------------------------------
@@ -885,7 +916,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
 
         best = pick_best_candidate(candidates)
         if best.get("confidence", 0) < CONFIDENCE_THRESHOLD:
-            # wait=True is not optional here - same reasoning as
+            # Waiting is not optional here - same reasoning as
             # stop_session()/_handle_pause() above, and the exact same bug
             # shape: without it, speak_dialog() only enqueues the TTS
             # request and returns immediately, so ask_yesno() right
@@ -898,7 +929,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             # (and could time out) while audio was still queued/
             # playing, not synced to when the user could actually
             # have heard the question and started answering.
-            self.speak_dialog('that_would_be', data={"description": self._describe_short(best)}, wait=True)
+            self._speak_dialog_and_wait('that_would_be', data={"description": self._describe_short(best)})
             confirm = self.ask_yesno('is_it_that')
             if not confirm or confirm == 'no':
                 self.speak_dialog('no_content')
@@ -965,6 +996,51 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         """One line of a dialog file, in the language of the request in
         flight (the renderer follows the session, like speak_dialog)."""
         return self.dialog_renderer.render(dialog, data)
+
+    def _option(self, key: str, default):
+        """A setting from the plugin's section of mycroft.conf, which
+        ovos-core hands the plugin as its config
+        (intents["ovos-common-reading-pipeline-plugin"]), else from the
+        plugin's settings file, else `default`."""
+        for source in (getattr(self, "config", None), self.settings):
+            if isinstance(source, dict) and source.get(key) is not None:
+                return source[key]
+        return default
+
+    def _positive_option(self, key: str, default: float, allow_zero: bool = False) -> float:
+        """_option() as a number above zero (or zero, with allow_zero). A
+        value that isn't one is warned about once and `default` used."""
+        raw = self._option(key, default)
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            value = -1.0
+        if value > 0 or (value == 0 and allow_zero):
+            return value
+        if (key, repr(raw)) not in self._rejected_options:
+            self._rejected_options.add((key, repr(raw)))
+            self.log.warning(f"ignoring {key}={raw!r}, using {default}")
+        return default
+
+    def _spoken_wait(self, text: str) -> int:
+        """spoken_wait() with the configured speaking rate and margin."""
+        return spoken_wait(text,
+                           self._positive_option("chars_per_second", SPOKEN_CHARS_PER_SECOND),
+                           self._positive_option("wait_margin", SPOKEN_WAIT_MARGIN, allow_zero=True))
+
+    def _speak_dialog_and_wait(self, key: str, data: Optional[dict] = None):
+        """speak_dialog(key, data, wait=True), with the wait sized to the
+        line (#41) instead of a flat 15 s.
+
+        speak_dialog() takes its wait before it has picked the line, so this
+        does what it does in the order the size needs: render the line with
+        the same renderer, then hand it to speak() with the same meta."""
+        data = data or {}
+        if not self.dialog_renderer:
+            self.speak_dialog(key, data, wait=True)
+            return
+        utterance = self.dialog_renderer.render(key, data)
+        self.speak(utterance, wait=self._spoken_wait(utterance), meta={"dialog": key, "data": data})
 
     def _request(self, message: Optional[Message], msg_type: str, data: dict,
                  lang: Optional[str] = None) -> Message:
@@ -1066,7 +1142,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         # a "stop" said over "Here it is: ..." then stops it (can_stop says
         # yes, and the story never starts) instead of finding nothing to stop.
         reading = self._begin_reading(message, candidate)
-        self.speak_dialog('i_know_that', data={"description": self._describe(candidate)}, wait=True)
+        self._speak_dialog_and_wait('i_know_that', data={"description": self._describe(candidate)})
         self._read_in_background(message, reading, bookmark)
 
     def _begin_reading(self, message: Optional[Message], candidate, lang: Optional[str] = None) -> _Reading:
@@ -1128,8 +1204,9 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         (dig_for_message). With the dispatch message here, every sentence
         carries the session and routing of the request that started the
         story - on a HiveMind hub that is what gets it to the right client -
-        and speak(wait=True) waits for that session's audio_output_end, so
-        a client that reports its playback paces the story."""
+        and speak(wait=...) waits for that session's audio_output_end, so
+        a client that reports its playback paces the story. One that doesn't
+        is waited on for as long as each sentence takes to say (#41)."""
         try:
             self._read_sentences(message, reading, bookmark)
         except Exception as e:
@@ -1178,10 +1255,10 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             # with every '.' replaced by a space - the full stop that ends
             # the sentence, "Mr. Fox", "3.5" - and a sentence that happens to
             # equal a dialog name would be swapped for that dialog.
-            self.speak(sentence, wait=True)
+            self.speak(sentence, wait=self._spoken_wait(sentence))
             # only marked done AFTER actually speaking it - if pause
             # sets the stop flag while this sentence is mid-speech,
-            # speak(wait=True) still finishes it before returning, so
+            # speak(wait=...) still finishes it before returning, so
             # the bookmark correctly reflects that this sentence WAS
             # heard, while the next loop iteration's stop check (above)
             # correctly stops before the one after it.

@@ -13,7 +13,7 @@ The loop runs on its own thread in the plugin (see _start_reading); these
 tests call it directly, on the test's thread, to check what it reads."""
 from unittest.mock import MagicMock
 
-from conftest import CommonReadingPipeline, ContentFetchError, entry, session_message
+from conftest import CommonReadingPipeline, ContentFetchError, entry, module, session_message
 
 
 def _candidate(skill_id="ovos-skill-grimm-tales.andlo", content_id="Cinderella", source="grimmstories.com"):
@@ -46,15 +46,22 @@ def test_reads_every_sentence_across_multiple_paragraphs(plugin):
     assert _spoken(plugin) == ["First sentence.", "Second sentence", "Third sentence"]
 
 
-def test_every_sentence_waits_for_its_playback(plugin):
-    """Pacing: each sentence goes out with wait=True, so a client that
-    reports audio_output_end on the session sets the pace (see #41)."""
+def test_every_sentence_waits_as_long_as_it_takes_to_say(plugin):
+    """Pacing: each sentence waits for its playback, so a client that
+    reports audio_output_end on the session sets the pace, but only for as
+    long as the sentence takes to say (#41): a client that never reports
+    no longer leaves 15 s of silence after "Yes."."""
     _wire(plugin)
-    plugin._fetch_content = MagicMock(return_value=["One. Two."])
+    long = ("The king had a daughter who was so beautiful that the sun itself, "
+            "which had seen so many things, wondered at her whenever it shone on her face.")
+    plugin._fetch_content = MagicMock(return_value=[
+        f"Yes. Then the old woman went home, and the girl stayed. {long}"])
 
     _read(plugin, _candidate())
 
-    assert all(c.kwargs.get("wait") is True for c in plugin.speak.call_args_list)
+    waits = [c.kwargs["wait"] for c in plugin.speak.call_args_list]
+    assert waits == [module.spoken_wait(s) for s in _spoken(plugin)]
+    assert waits == [4, 7, 14]
 
 
 def test_sentences_keep_their_full_stops(plugin):
