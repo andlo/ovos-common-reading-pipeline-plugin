@@ -3,6 +3,8 @@ by ping/pong (see #2) - 'nothing installed' vs 'installed but no
 collection match' vs 'installed but no phrase match'."""
 from unittest.mock import MagicMock
 
+from conftest import dispatch_message
+
 
 def _wire(plugin):
     plugin.speak_dialog = MagicMock()
@@ -13,7 +15,7 @@ def test_no_pongs_speaks_no_content_providers(plugin):
     _wire(plugin)
     plugin._ping_providers = MagicMock(return_value=[])
 
-    plugin._handle_no_candidates(collection_hint=None)
+    plugin._handle_no_candidates(dispatch_message(), collection_hint=None)
 
     plugin.speak_dialog.assert_called_once_with('no_content_providers')
 
@@ -25,7 +27,7 @@ def test_no_pongs_with_collection_hint_still_speaks_no_content_providers(plugin)
     _wire(plugin)
     plugin._ping_providers = MagicMock(return_value=[])
 
-    plugin._handle_no_candidates(collection_hint="grimm")
+    plugin._handle_no_candidates(dispatch_message(), collection_hint="grimm")
 
     plugin.speak_dialog.assert_called_once_with('no_content_providers')
 
@@ -36,7 +38,7 @@ def test_pongs_but_no_phrase_match_speaks_no_matching_content(plugin):
         {"skill_id": "ovos-skill-grimm-tales.andlo", "collection": "Grimm's Fairy Tales"},
     ])
 
-    plugin._handle_no_candidates(collection_hint=None)
+    plugin._handle_no_candidates(dispatch_message(), collection_hint=None)
 
     plugin.speak_dialog.assert_called_once_with('no_matching_content')
 
@@ -47,7 +49,7 @@ def test_pongs_with_collection_hint_speaks_no_such_collection(plugin):
         {"skill_id": "ovos-skill-grimm-tales.andlo", "collection": "Grimm's Fairy Tales"},
     ])
 
-    plugin._handle_no_candidates(collection_hint="perrault")
+    plugin._handle_no_candidates(dispatch_message(), collection_hint="perrault")
 
     plugin.speak_dialog.assert_called_once_with('no_such_collection', data={"collection": "perrault"})
 
@@ -59,7 +61,7 @@ def test_ping_only_fires_once_per_no_candidates_call(plugin):
     _wire(plugin)
     plugin._ping_providers = MagicMock(return_value=[])
 
-    plugin._handle_no_candidates(collection_hint=None)
+    plugin._handle_no_candidates(dispatch_message(), collection_hint=None)
 
     plugin._ping_providers.assert_called_once()
 
@@ -69,6 +71,8 @@ def test_search_and_read_calls_handle_no_candidates_when_nothing_found(plugin):
     plugin._search_providers = MagicMock(return_value=[])
     plugin._handle_no_candidates = MagicMock()
 
-    plugin._search_and_read("cinderella", collection_hint="grimm")
+    message = dispatch_message()
 
-    plugin._handle_no_candidates.assert_called_once_with("grimm")
+    plugin._search_and_read(message, "cinderella", collection_hint="grimm")
+
+    plugin._handle_no_candidates.assert_called_once_with(message, "grimm")

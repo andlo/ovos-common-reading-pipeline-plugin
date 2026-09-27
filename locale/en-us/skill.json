@@ -8,6 +8,7 @@
   "name": "Common Reading Pipeline",
   "description": "A generic reading pipeline: recognizes requests to read stories, articles, reports, horoscopes and more aloud, and routes them to whichever installed provider skill can supply that content. Not tied to any single content type or source.",
   "examples": [
+    "Tell me a story",
     "Tell me a story about cinderella",
     "Read me an article about penguins",
     "Tell me a story from grimm",

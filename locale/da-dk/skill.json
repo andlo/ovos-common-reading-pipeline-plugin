@@ -8,6 +8,7 @@
   "name": "Generisk læsepipeline",
   "description": "En generisk læsepipeline: genkender anmodninger om at få historier, artikler, rapporter, horoskoper og mere læst højt, og videresender dem til det installerede skill, der kan levere indholdet. Ikke bundet til én bestemt indholdstype eller kilde.",
   "examples": [
+    "Fortæl mig et eventyr",
     "Fortæl mig en historie om askepot",
     "Læs mig en artikel om pingviner",
     "Fortæl mig en historie fra grimm",

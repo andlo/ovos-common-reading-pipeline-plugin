@@ -80,6 +80,51 @@ import pytest
     ("en-us", "can you tell me a story about the little mermaid", "read_content"),
     ("da-dk", "kan du læse mig en historie om askepot", "read_content"),
     ("da-dk", "kan du fortælle mig en historie om den lille havfrue", "read_content"),
+    # "tell me a story" with no title: its own intent, read_any_story, which
+    # searches with phrase=None so a provider picks the story. Must not take
+    # the titled/collection forms, and never anything that isn't a story.
+    ("en-us", "tell me a story", "read_any_story"),
+    ("en-us", "Tell me a fairy tale", "read_any_story"),
+    ("en-us", "read me a bedtime story", "read_any_story"),
+    ("en-us", "can you tell me another story", "read_any_story"),
+    ("en-us", "tell me a story please", "read_any_story"),
+    ("en-us", "tell me a story about cinderella", "read_content"),
+    ("en-us", "tell me a story from grimm", "read_by_collection"),
+    ("en-us", "tell me a joke", None),
+    ("en-us", "read me an article", None),
+    ("da-dk", "fortæl mig et eventyr", "read_any_story"),
+    ("da-dk", "læs et eventyr op for mig", "read_any_story"),
+    ("da-dk", "fortæl en historie for mig", "read_any_story"),
+    ("da-dk", "fortæl mig en vittighed", None),
+    ("fr-fr", "raconte-moi une histoire", "read_any_story"),
+    ("fr-fr", "raconte moi une histoire", "read_any_story"),  # STT without the hyphen
+    ("fr-fr", "lis-moi un conte", "read_any_story"),
+    ("fr-fr", "raconte-moi un conte", "read_any_story"),
+    ("fr-fr", "raconte-nous une histoire", "read_any_story"),
+    ("fr-fr", "peux-tu me raconter une histoire", "read_any_story"),
+    ("fr-fr", "raconte-moi une histoire s'il te plaît", "read_any_story"),
+    ("fr-fr", "raconte-moi une histoire sur cendrillon", "read_content"),
+    ("fr-fr", "raconte-moi une histoire de cosquin", "read_by_collection"),
+    ("fr-fr", "lis-moi les nouvelles", None),
+    ("fr-fr", "raconte-moi une blague", None),
+    ("de-de", "erzähl mir eine Geschichte", "read_any_story"),
+    ("de-de", "erzähle mir eine geschichte", "read_any_story"),
+    ("de-de", "lies mir ein Märchen vor", "read_any_story"),
+    ("de-de", "erzähl mir ein Märchen", "read_any_story"),
+    ("de-de", "kannst du mir eine Geschichte vorlesen", "read_any_story"),
+    ("de-de", "erzähl uns bitte eine Geschichte", "read_any_story"),
+    ("de-de", "erzähl mir eine geschichte über aschenputtel", "read_content"),
+    ("de-de", "lies mir eine grimm-Geschichte", "read_by_collection"),
+    ("de-de", "lies mir die Nachrichten vor", None),
+    ("de-de", "erzähl mir einen Witz", None),
+    ("es-es", "cuéntame un cuento", "read_any_story"),
+    ("it-it", "raccontami una fiaba", "read_any_story"),
+    ("nl-nl", "lees me een sprookje voor", "read_any_story"),
+    ("pt-pt", "conta-me uma história", "read_any_story"),
+    ("es-es", "cuéntame un chiste", None),
+    ("it-it", "raccontami una barzelletta", None),
+    ("nl-nl", "vertel me een mop", None),
+    ("pt-pt", "conta-me uma piada", None),
 ])
 def test_real_bundled_intents_match(plugin, lang, phrase, expected_intent):
     container = plugin._get_intent_container(lang)
@@ -125,4 +170,13 @@ def test_intent_container_is_cached_per_language(plugin):
     first = plugin._get_intent_container("en-us")
     second = plugin._get_intent_container("en-us")
     assert first is second
+
+
+def test_region_and_case_variants_share_the_language_container(plugin):
+    """ovos-core hands match() "fr-FR"; a Canadian device says "fr-CA".
+    Both are French: same locale folder, same trained container."""
+    french = plugin._get_intent_container("fr-fr")
+    assert plugin._get_intent_container("fr-FR") is french
+    assert plugin._get_intent_container("fr-CA") is french
+    assert french.calc_intent("raconte-moi une histoire").get("name") == "read_any_story"
 
