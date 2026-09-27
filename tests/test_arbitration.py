@@ -51,21 +51,20 @@ def test_pick_best_candidate_missing_confidence_defaults_to_zero():
     assert best["skill_id"] == "b"
 
 
-def test_describe_includes_all_present_fields(en):
+def test_describe_includes_all_present_fields_but_the_source(en):
+    """The source is said once, after the story (finished_reading)."""
     candidate = {
         "title": "Cinderella",
         "author": "Brothers Grimm",
         "collection": "Household Tales",
         "source": "grimmstories.com",
     }
-    assert en._describe(candidate) == (
-        "Cinderella, by Brothers Grimm, from Household Tales, sourced from grimmstories.com"
-    )
+    assert en._describe(candidate) == "Cinderella, by Brothers Grimm, from Household Tales"
 
 
 def test_describe_gracefully_skips_missing_fields(en):
     candidate = {"title": "Cinderella", "author": "", "source": "grimmstories.com"}
-    assert en._describe(candidate) == "Cinderella, sourced from grimmstories.com"
+    assert en._describe(candidate) == "Cinderella"
 
 
 def test_describe_title_only(en):
@@ -75,9 +74,7 @@ def test_describe_title_only(en):
 
 def test_describe_discloses_machine_translation(en):
     candidate = {"title": "Kedelige installationer", "source": "blog.openvoiceos.org", "machine_translated": True}
-    assert en._describe(candidate) == (
-        "Kedelige installationer, sourced from blog.openvoiceos.org, machine translated"
-    )
+    assert en._describe(candidate) == "Kedelige installationer, machine translated"
 
 
 def test_describe_omits_disclosure_when_not_translated(en):

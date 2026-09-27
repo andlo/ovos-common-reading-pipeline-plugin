@@ -13,7 +13,7 @@ import pytest
 from conftest import REPO_ROOT, use_real_dialogs
 
 LOCALES = sorted(p.name for p in (Path(REPO_ROOT) / "locale").iterdir() if p.is_dir())
-NEW_DIALOGS = ["by_author", "from_collection", "sourced_from", "machine_translated",
+NEW_DIALOGS = ["by_author", "from_collection", "machine_translated", "finished_reading",
                "finished_reading_unsourced"]
 ENGLISH_JOINERS = {"by", "from", "sourced", "translated", "the", "machine"}
 
@@ -53,7 +53,7 @@ def test_french_description_reads_naturally(plugin, monkeypatch):
 
     assert plugin._describe(LA_BICHE) == (
         "La Biche blanche, par Emmanuel Cosquin, tiré du recueil Contes populaires de Lorraine, "
-        "source : Projet Gutenberg, traduit automatiquement")
+        "traduit automatiquement")
     assert plugin._describe_short(LA_BICHE) == "La Biche blanche, par Emmanuel Cosquin"
 
 
@@ -62,20 +62,22 @@ def test_german_description_reads_naturally(plugin, monkeypatch):
 
     assert plugin._describe(ASCHENBROEDEL) == (
         "Aschenbrödel, von Ludwig Bechstein, aus der Sammlung Deutsches Märchenbuch, "
-        "Quelle: Projekt Gutenberg, maschinell übersetzt")
+        "maschinell übersetzt")
     assert plugin._describe_short(ASCHENBROEDEL) == "Aschenbrödel, von Ludwig Bechstein"
 
 
 @pytest.mark.parametrize("lang,candidate", [("fr-fr", LA_BICHE), ("de-de", ASCHENBROEDEL)])
 def test_announcements_carry_no_english_words(plugin, monkeypatch, lang, candidate):
-    """What is actually spoken before the story - 'i_know_that' around the
-    description, and the 'is it that one?' lead-in - has no English left."""
+    """What is actually spoken around the story - 'i_know_that' around the
+    description, the 'is it that one?' lead-in, and the closing line with
+    the source - has no English left."""
     use_real_dialogs(plugin, monkeypatch, lang)
     plugin.speak = MagicMock()
 
     for _ in range(10):  # the dialogs pick a random line; try them all
         plugin.speak_dialog('i_know_that', data={"description": plugin._describe(candidate)})
         plugin.speak_dialog('that_would_be', data={"description": plugin._describe_short(candidate)})
+        plugin.speak_dialog('finished_reading', data={"source": candidate["source"]})
         plugin.speak_dialog('finished_reading_unsourced')
 
     spoken = [c.args[0] for c in plugin.speak.call_args_list]
@@ -84,13 +86,13 @@ def test_announcements_carry_no_english_words(plugin, monkeypatch, lang, candida
         assert not _words(line, candidate) & ENGLISH_JOINERS, line
 
 
-def test_english_description_is_unchanged(plugin, monkeypatch):
+def test_english_description(plugin, monkeypatch):
     use_real_dialogs(plugin, monkeypatch, "en-us")
     candidate = {"title": "Cinderella", "author": "Brothers Grimm", "collection": "Household Tales",
                  "source": "grimmstories.com", "machine_translated": True}
 
     assert plugin._describe(candidate) == (
-        "Cinderella, by Brothers Grimm, from Household Tales, sourced from grimmstories.com, machine translated")
+        "Cinderella, by Brothers Grimm, from Household Tales, machine translated")
 
 
 @pytest.mark.parametrize("lang", ["fr-fr", "de-de", "da-dk", "es-es", "it-it", "nl-nl", "pt-pt"])
@@ -103,3 +105,6 @@ def test_no_locale_renders_a_dialog_name(plugin, monkeypatch, lang):
 
     assert "_" not in description
     assert plugin._render('finished_reading_unsourced') != "finished_reading_unsourced"
+    for _ in range(10):
+        closing = plugin._render('finished_reading', source="S")
+        assert "_" not in closing and "{" not in closing and closing.endswith("S.")

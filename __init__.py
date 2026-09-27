@@ -1043,31 +1043,33 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         If the provider flagged 'machine_translated', that's disclosed
         here too, since this runs right before reading starts.
 
+        The source is not in it: it is said once, when the story is over
+        ('finished_reading'). It used to be said here too, so every story
+        named it twice; unlike the translation note, a credit doesn't have
+        to come before the story.
+
         The words around each field ("by", "from", ...) come from the
-        locale's by_author/from_collection/sourced_from/machine_translated
-        dialogs, so a French story is announced in French all the way
-        through."""
+        locale's by_author/from_collection/machine_translated dialogs, so
+        a French story is announced in French all the way through."""
         parts = [candidate["title"]]
         if candidate.get("author"):
             parts.append(self._render('by_author', author=candidate["author"]))
         if candidate.get("collection"):
             parts.append(self._render('from_collection', collection=candidate["collection"]))
-        if candidate.get("source"):
-            parts.append(self._render('sourced_from', source=candidate["source"]))
         if candidate.get("machine_translated"):
             parts.append(self._render('machine_translated'))
         return ", ".join(parts)
 
     def _describe_short(self, candidate):
         """A shorter version of _describe() - title and author only,
-        no collection/source/translation notes - for the low-confidence
+        no collection/translation notes - for the low-confidence
         confirmation dialog ('is this the one you meant?'), which needs
         just enough to help the person recognize/distinguish the match,
         not the full announcement _describe() builds for right before
         actually reading starts. Real request that led to this: 'Yes,
         it could be "how to boil an egg in 100 ways" by Andreas' reads
         naturally; the full _describe() output (also tacking on
-        collection/source/translation-flag) would be a mouthful for a
+        collection/translation-flag) would be a mouthful for a
         quick yes/no check."""
         parts = [candidate["title"]]
         if candidate.get("author"):
@@ -1405,6 +1407,9 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         if not current:
             return  # a newer story took over this session; it has its own ending
         self._deactivate(message)
+        # The only place the source is named (see _describe): after the last
+        # sentence, and never for a story that was stopped or paused (the
+        # return above), which the listener hasn't finished.
         if candidate.get("source"):
             self.speak_dialog('finished_reading', data={"source": candidate["source"]})
         else:
