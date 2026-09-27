@@ -342,12 +342,15 @@ plugin confirms with the user before continuing). If a provider sets
 `"machine_translated": true`, that's disclosed as part of the
 announcement right before reading starts.
 
-`title`, `author`, `collection` and `source` are spoken as they are, in
-an announcement like "La Biche blanche, par Emmanuel Cosquin, tiré du
-recueil Contes populaires de Lorraine, source : Projet Gutenberg". The
+`title`, `author` and `collection` are spoken as they are, in an
+announcement like "La Biche blanche, par Emmanuel Cosquin, tiré du
+recueil Contes populaires de Lorraine". `source` is said once, after
+the last sentence: "Et voilà, c'est la fin. C'était tiré de Project
+Gutenberg." A story that is stopped or paused doesn't get that line; it
+comes when the story is finished, after a "continue" if need be. The
 words around them come from this plugin's locale (`by_author.dialog`,
-`from_collection.dialog`, `sourced_from.dialog`,
-`machine_translated.dialog`), so give plain names ("Emmanuel Cosquin",
+`from_collection.dialog`, `machine_translated.dialog`,
+`finished_reading.dialog`), so give plain names ("Emmanuel Cosquin",
 not "collected by Emmanuel Cosquin"). `content_id` is only ever sent
 back to you, in the fetch, and keys the bookmark; it may differ from the
 title.
