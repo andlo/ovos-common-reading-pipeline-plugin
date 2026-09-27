@@ -275,3 +275,39 @@ def test_a_client_that_reports_playback_still_sets_the_pace(live):
     for spoken, following in zip(story, story[1:]):
         end = min(t for t in ends if t > spoken)
         assert end < following < end + 0.5
+
+
+def test_narrated_sentences_carry_ssml_beside_the_same_text(live):
+    """#40 on a real bus: with narration on, every sentence still goes out on
+    speak()'s topic, forwarded from the dispatch (session, route, language),
+    with the plain text unchanged and its SSML in utterance_ssml."""
+    plugin, bus = live
+    plugin.config = {"narration": "ssml"}
+    speaks = Recorder(bus, "speak")
+
+    dispatch = _dispatch(plugin, bus, "alice", "read_content", {"title": "rapunzel"}, lang="fr-FR")
+    plugin._readings["alice"].thread.join(60)
+
+    story = [m for _, m in speaks.of("speak") if m.data["utterance"] in SENTENCES]
+    assert [m.data["utterance"] for m in story] == SENTENCES
+    for message in story:
+        assert message.context["session"]["session_id"] == "alice"
+        assert message.context["source"] == dispatch.context["source"]
+        assert message.context["destination"] == dispatch.context["destination"]
+        assert message.data["lang"] == "fr-FR"
+        assert message.data["utterance_ssml"] == module.narrate(
+            message.data["utterance"],
+            module.STORY_START_BREAK_MS if message is story[0] else 0)
+    # the announcement and the other dialogs stay plain
+    assert all("utterance_ssml" not in m.data for _, m in speaks.of("speak") if m not in story)
+
+
+def test_without_narration_no_sentence_carries_ssml(live):
+    plugin, bus = live
+    speaks = Recorder(bus, "speak")
+
+    _dispatch(plugin, bus, "alice", "read_content", {"title": "rapunzel"})
+    plugin._readings["alice"].thread.join(60)
+
+    assert speaks.of("speak")
+    assert all("utterance_ssml" not in m.data for _, m in speaks.of("speak"))
