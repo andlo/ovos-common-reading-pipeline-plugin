@@ -117,6 +117,21 @@ the plugin itself reads nothing from it today, but ovos-core does
   that doesn't is waited on for up to 15 s per sentence (see
   [#41](https://github.com/andlo/ovos-common-reading-pipeline-plugin/issues/41)).
 
+### The news is left to news skills
+
+"Read the news", "read me the latest news about France", "read me
+today's news" and their equivalents in the other languages are not
+claimed. This plugin sits ahead of every news skill in the pipeline, so
+whatever it claims never reaches one, and no provider in this family
+serves the news. The intents list no word for the news as a kind of
+text ("a piece of news", "en nyhed", "eine Nachricht", ...). Where an
+open slot can still capture one (English "read the {title}" and "read
+me my/today's {content_type}", Danish "læs dagens {content_type}"),
+`match()` declines a title or content type holding a word from
+`locale/<lang>/news.voc`. French keeps "une nouvelle", which in a
+reading request is as often a short story as a news item; French asks
+for the news in the plural ("les nouvelles"), which nothing here takes.
+
 ### Several users at once (HiveMind hubs)
 
 On a HiveMind hub every connected client talks to the same ovos-core,
