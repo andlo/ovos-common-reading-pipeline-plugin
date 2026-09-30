@@ -16,6 +16,7 @@ from conftest import (
     COMMON_READING_PING,
     COMMON_READING_PONG,
     dispatch_message,
+    module,
 )
 
 
@@ -24,6 +25,7 @@ def bus(plugin, monkeypatch):
     plugin._bus = FakeBus()
     # the search/ping windows are plain sleeps; FakeBus answers synchronously
     monkeypatch.setattr(real_time, "sleep", lambda *_: None)
+    monkeypatch.setattr(module, "SEARCH_GRACE", 0.01)  # nobody answers late here
     return plugin._bus
 
 
@@ -168,3 +170,30 @@ def test_ping_providers_collects_all_pongs(plugin, bus):
 
 def test_ping_providers_no_pongs_returns_empty_list(plugin, bus):
     assert plugin._ping_providers(dispatch_message()) == []
+
+
+def test_a_late_answer_is_still_taken(plugin, monkeypatch):
+    """Nothing within the window: wait a little longer for the first answer
+    instead of telling the user nothing is installed."""
+    import threading
+    plugin._bus = FakeBus()
+    monkeypatch.setattr(module, "SEARCH_SETTLE", 0.01)
+
+    def late(m):
+        threading.Timer(0.05, lambda: plugin._bus.emit(m.reply(
+            COMMON_READING_SEARCH_RESPONSE, {"skill_id": "slow", "title": "X", "confidence": 1.0}))).start()
+
+    plugin._bus.on(COMMON_READING_SEARCH, late)
+    monkeypatch.setattr(module, "SEARCH_TIMEOUT", 0.01)
+    monkeypatch.setattr(module, "SEARCH_GRACE", 2.0)
+    results = plugin._search_providers(dispatch_message(), "x", timeout=0.01)
+    assert [r["skill_id"] for r in results] == ["slow"]
+
+
+def test_no_answer_at_all_gives_up_after_the_grace(plugin, monkeypatch):
+    plugin._bus = FakeBus()
+    monkeypatch.setattr(module, "SEARCH_TIMEOUT", 0.01)
+    monkeypatch.setattr(module, "SEARCH_GRACE", 0.05)
+    started = real_time.monotonic()
+    assert plugin._search_providers(dispatch_message(), "x", timeout=0.01) == []
+    assert real_time.monotonic() - started < 1

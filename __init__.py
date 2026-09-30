@@ -113,6 +113,11 @@ COMMON_READING_VOCABULARY = "ovos.common_reading.vocabulary"
 COMMON_READING_VOCABULARY_GET = "ovos.common_reading.vocabulary.get"
 
 SEARCH_TIMEOUT = 2.0  # seconds to wait for provider skills to answer a search
+# ...and when none has answered by then, how much longer to wait for the
+# first answer (a busy device, a provider matching a long title list), and
+# how long to collect after it. Costs nothing when answers come in time.
+SEARCH_GRACE = 3.0
+SEARCH_SETTLE = 0.5
 FETCH_TIMEOUT = 10.0  # seconds to wait for the winning provider to deliver text
 PING_TIMEOUT = 0.3  # seconds - short, since a pong is cheap (no index lookup)
 CONFIDENCE_THRESHOLD = 0.8  # provider search-response confidence needed to skip "is it that one?"
@@ -1250,7 +1255,9 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         'something is installed but found nothing' via a lightweight
         ping/pong (see #2), rather than guessing at a fallback
         language or just saying the same generic thing either way."""
-        if self._ping_providers(message):
+        # a provider that announced its vocabulary is installed, even when
+        # it is too busy to pong within PING_TIMEOUT
+        if self._ping_providers(message) or self._vocab:
             if collection_hint:
                 self.speak_dialog('no_such_collection', data={"collection": collection_hint})
             else:
@@ -1405,7 +1412,7 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         return lang or self.lang
 
     def _collect_replies(self, request: Message, reply_type: str, timeout: float,
-                         first_only: bool = False) -> List[Message]:
+                         first_only: bool = False, grace: float = 0.0) -> List[Message]:
         """Emit `request` and collect the `reply_type` answers to it.
 
         Only answers for the session that asked are taken. Two people on a
@@ -1416,7 +1423,10 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
 
         first_only returns as soon as one answer is in (a fetch has exactly
         one addressee); otherwise answers are collected for the whole window
-        (a search goes to every provider)."""
+        (a search goes to every provider). With `grace`, a window that closes
+        with no answer at all is stretched by up to `grace` seconds for the
+        first one, then SEARCH_SETTLE for the rest: on a busy device the
+        answers came at 2.4 s and the user was told nothing was installed."""
         session_id = _session_id(request)
         replies = []
         answered = threading.Event()
@@ -1435,6 +1445,8 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
                 answered.wait(timeout)
             else:
                 time.sleep(timeout)
+                if grace and not replies and answered.wait(grace):
+                    time.sleep(SEARCH_SETTLE)
         finally:
             self.bus.remove(reply_type, collect)
         return replies
@@ -1450,7 +1462,8 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
             "content_type": content_type,
         })
         return [reply.data for reply in
-                self._collect_replies(request, COMMON_READING_SEARCH_RESPONSE, timeout)]
+                self._collect_replies(request, COMMON_READING_SEARCH_RESPONSE, timeout,
+                                      grace=SEARCH_GRACE if timeout >= SEARCH_TIMEOUT else 0.0)]
 
     def _ping_providers(self, message: Optional[Message], timeout=PING_TIMEOUT):
         """Broadcast a lightweight 'is anyone there?' and collect pongs.
