@@ -8,7 +8,7 @@ one ("read the {title}", "read me today's {content_type}") are declined
 against locale/<lang>/news.voc."""
 import pytest
 
-from conftest import session_message
+from conftest import announce_typical_providers, session_message
 
 NEWS = [
     # the bare "read the {title}" line took all of these, title and all
@@ -51,9 +51,9 @@ NEWS = [
 STORIES = [
     ("en-us", "read the story Rapunzel", "read_content", "rapunzel"),
     ("en-us", "tell me the story Cinderella", "read_content", "cinderella"),
-    ("en-us", "read me the little mermaid", "read_content", "little mermaid"),
+    ("en-us", "read me the little mermaid", "read_content", "the little mermaid"),
     ("en-us", "tell me a story about the ugly duckling", "read_content", "the ugly duckling"),
-    ("en-us", "read me the latest post from ovosblog", "read_content", "latest post from ovosblog"),
+    ("en-us", "read me the latest post from ovosblog", "read_by_collection", None),
     ("en-us", "read me today's horoscope", "read_by_type", None),
     ("en-us", "tell me a story", "read_any_story", None),
     ("da-dk", "læs historien om rapunzel", "read_content", "rapunzel"),
@@ -63,11 +63,11 @@ STORIES = [
     ("it-it", "raccontami la storia Cenerentola", "read_content", "cenerentola"),
     ("nl-nl", "vertel me het verhaal Assepoester", "read_content", "assepoester"),
     ("pt-pt", "conta-me a história Cinderela", "read_content", "cinderela"),
-    ("fr-fr", "raconte-moi l'histoire la biche blanche", "read_content", "la biche blanche"),
+    ("fr-fr", "raconte-moi l'histoire la biche blanche", "read_content", "biche blanche"),
     # kept on purpose: in a reading request "une nouvelle" is the literary
     # short story as often as a news item, and French asks for the news in
     # the plural ("les nouvelles", above)
-    ("fr-fr", "lis-moi une nouvelle sur la mer", "read_content", "la mer"),
+    ("fr-fr", "lis-moi une nouvelle sur la mer", "read_content", "mer"),
 ]
 
 
@@ -79,6 +79,7 @@ def trained():
 @pytest.fixture
 def plugin(plugin, trained):
     plugin._intent_containers = trained
+    announce_typical_providers(plugin)
     return plugin
 
 

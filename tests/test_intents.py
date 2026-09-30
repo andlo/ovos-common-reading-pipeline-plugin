@@ -72,7 +72,7 @@ def test_match_data_is_never_none_real_crash_found_via_live_testing(plugin):
 
     assert result.match_data is not None
     assert isinstance(result.match_data, dict)
-    assert result.match_data == {"title": "cinderella"}
+    assert result.match_data == {"content_type": "story", "title": "cinderella"}
 
 
 def test_match_data_is_a_dict_even_without_entities(plugin):
@@ -82,7 +82,7 @@ def test_match_data_is_a_dict_even_without_entities(plugin):
     result = plugin.match(["tell me a story"], "en-us", session_message())
 
     assert result.match_type == f"{plugin.skill_id}:read_any_story"
-    assert result.match_data == {}
+    assert result.match_data == {"content_type": "story"}
 
 
 def test_read_content_handler_searches_for_the_title(plugin):
@@ -91,7 +91,7 @@ def test_read_content_handler_searches_for_the_title(plugin):
 
     plugin.handle_read_content(message)
 
-    plugin._search_and_read.assert_called_once_with(message, "cinderella")
+    plugin._search_and_read.assert_called_once_with(message, "cinderella", content_type=None)
 
 
 def test_read_by_collection_handler_passes_the_collection_hint(plugin):
@@ -100,7 +100,8 @@ def test_read_by_collection_handler_passes_the_collection_hint(plugin):
 
     plugin.handle_read_by_collection(message)
 
-    plugin._search_and_read.assert_called_once_with(message, None, collection_hint="grimm")
+    plugin._search_and_read.assert_called_once_with(message, None, collection_hint="grimm",
+                                                    content_type=None)
 
 
 def test_read_by_type_handler_passes_the_content_type(plugin):

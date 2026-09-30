@@ -31,8 +31,11 @@ you want them to be more intelligent, read them more fairy tales."_
 pip install ovos-common-reading-pipeline-plugin
 ```
 
-Add it to your pipeline in `mycroft.conf` **right after your stop
-matcher** (`stop_high`/`ovos-stop-pipeline-plugin-high`) - roughly
+Add it to your pipeline in `mycroft.conf` in two places: the `-high`
+stage **right after your stop matcher**, and the `-low` stage after
+padatious/adapt, before common query and the fallbacks (see
+[How a request is recognised](#how-a-request-is-recognised)). The
+`-high` stage goes (`stop_high`/`ovos-stop-pipeline-plugin-high`) - roughly
 where OCP sits, not before stop. "Stop" should always be the most
 reliable, highest-priority command regardless of what skill is active;
 putting anything ahead of it undermines that guarantee for every skill,
@@ -50,9 +53,13 @@ matcher:
 ```diff
    "pipeline": [
      "stop_high",
-+    "ovos-common-reading-pipeline-plugin",
++    "ovos-common-reading-pipeline-plugin-high",
      "converse",
      "ocp_high",
+     ...
+     "adapt_medium",
++    "ovos-common-reading-pipeline-plugin-low",
+     "common_qa",
      ...
    ]
 ```
@@ -64,7 +71,7 @@ existing list beats copying a block):
 ```json
 "pipeline": [
   "ovos-stop-pipeline-plugin-high",
-  "ovos-common-reading-pipeline-plugin",
+  "ovos-common-reading-pipeline-plugin-high",
   "ovos-converse-pipeline-plugin",
   "ovos-ocp-pipeline-plugin-high",
   "ovos-persona-pipeline-plugin-high",
@@ -73,6 +80,7 @@ existing list beats copying a block):
   "ovos-adapt-pipeline-plugin-high",
   "ovos-stop-pipeline-plugin-medium",
   "ovos-adapt-pipeline-plugin-medium",
+  "ovos-common-reading-pipeline-plugin-low",
   "ovos-common-query-pipeline-plugin",
   "ovos-fallback-pipeline-plugin-medium",
   "ovos-persona-pipeline-plugin-low",
@@ -86,8 +94,10 @@ currently relevant to, so this position - right after stop, ahead of
 everything else - is enough for `pause`/`continue` to reliably reach
 it without needing to jump the stop queue.
 
-The stage is the plain id `ovos-common-reading-pipeline-plugin` (no
-`-high`/`-medium`/`-low` tiers). ovos-core hands the plugin whatever is
+The plain id `ovos-common-reading-pipeline-plugin` (what this README
+recommended before 0.3.0) still works: it runs both stages at that one
+spot. Adding the `-low` stage further down is what lets a skill whose own
+intent matches a bare title get it first. ovos-core hands the plugin whatever is
 under `intents["ovos-common-reading-pipeline-plugin"]` in `mycroft.conf`,
 and reads two keys from it itself (`match_timeout`, default 10 s, and
 `match_workers`, default 4). The plugin reads the keys below from the
@@ -111,10 +121,41 @@ when `mycroft.conf` doesn't set them:
 | `chars_per_second` | `14` | speaking rate the wait after each line is sized with (see below) |
 | `wait_margin` | `3` | seconds added to that wait, for synthesis |
 
+### How a request is recognised
+
+Like OCP: the sentence has to open with a reading verb ("tell me",
+"read me", "can you read", "fortæl mig", "lies mir", "raconte-moi"...),
+and what follows has to name something a provider said it can read.
+The pipeline itself only knows the words that take a sentence apart
+(`locale/<lang>/reading.json`: verbs, "about"/"from" connectors,
+articles, and the story words); **what can be read comes from the
+providers** (the [vocabulary](#4-vocabulary) message):
+
+- **`-high` stage** (right after stop): the sentence names a kind of
+  text ("a story", "my horoscope", "an article about...") or a
+  collection ("a story from grimm", "a grimm story"). "Tell me the
+  weather", "tell me the time", "read my messages" name neither, so
+  they go to the skills they belong to
+  ([#50](https://github.com/andlo/ovos-common-reading-pipeline-plugin/issues/50)).
+- **`-low` stage** (after padatious/adapt): a bare title ("tell me the
+  little mermaid", "læs den lille havfrue"), only when a provider
+  announced that title.
+
+The sentence is then split into what goes on to the providers: the
+kind of text (as the canonical name the provider announced, e.g.
+`"horoscope"` for "horoskop"), the collection, and whatever is left as
+the title. "Tell me my leo horoscope" is `content_type: "horoscope"`,
+title `"leo"`
+([#33](https://github.com/andlo/ovos-common-reading-pipeline-plugin/issues/33)).
+A provider with a new kind of text ("recipe", "poem") is reachable as
+soon as it announces the word, with no pipeline release
+([#36](https://github.com/andlo/ovos-common-reading-pipeline-plugin/issues/36)).
+Only "continue" and "pause" are still padacioso intents.
+
 ### How a request is handled
 
-- `match()` only recognizes the utterance (padacioso, a few
-  milliseconds) and claims it or not. It never searches, speaks or
+- `match_high()`/`match_low()` only recognize the utterance (a few
+  milliseconds) and claim it or not. It never searches, speaks or
   waits: ovos-core 3.7 gives each plugin's `match()` 10 s on a small
   worker pool, and an utterance whose `match()` runs longer falls
   through to the later pipeline stages.
@@ -187,12 +228,9 @@ Quoted dialogue, `!` and `?` are left alone.
 today's news" and their equivalents in the other languages are not
 claimed. This plugin sits ahead of every news skill in the pipeline, so
 whatever it claims never reaches one, and no provider in this family
-serves the news. The intents list no word for the news as a kind of
-text ("a piece of news", "en nyhed", "eine Nachricht", ...). Where an
-open slot can still capture one (English "read the {title}" and "read
-me my/today's {content_type}", Danish "læs dagens {content_type}"),
-`match()` declines a title or content type holding a word from
-`locale/<lang>/news.voc`. French keeps "une nouvelle", which in a
+serves the news. No provider announces the news as a kind of text, and
+a request whose title or kind of text holds a word from
+`locale/<lang>/news.voc` is declined anyway. French keeps "une nouvelle", which in a
 reading request is as often a short story as a news item; French asks
 for the news in the plural ("les nouvelles"), which nothing here takes.
 
@@ -261,7 +299,8 @@ there's nothing to read:
 
 See [ovos-skill-common-reading-example](https://github.com/andlo/ovos-skill-common-reading-example) -
 a template walking through two working patterns (RSS feeds and
-static-page scraping), the bus protocol, caching, and the judgment calls
+static-page scraping), the bus protocol (announce your
+[vocabulary](#4-vocabulary), or nothing reaches you), caching, and the judgment calls
 every provider has to make for itself (translate or not, what a human
 calls the source, what's worth reading aloud).
 
@@ -280,7 +319,7 @@ ovos.common_reading.search
 {
   "phrase": "<what the user asked for, or null for 'surprise me'>",
   "collection_hint": "<raw text like 'grimm' or 'h c andersen', or null>",
-  "content_type": "<raw hint like 'story', 'book', 'article', 'poem', or null>",
+  "content_type": "<the canonical kind of text asked for, as announced ('story', 'horoscope'), or null>",
   "lang": "<the language the request was made in, e.g. 'fr-FR'>",
   "requester": "<this plugin's id>"
 }
@@ -450,6 +489,45 @@ produces a misleading "nothing installed" message even when your skill
 is present and just didn't have a match. See
 [ovos-skill-common-reading-example](https://github.com/andlo/ovos-skill-common-reading-example)
 for the reference implementation.
+
+### 4. Vocabulary
+
+What a provider can read, in the words people use. **Required**: the
+pipeline only claims a request that names a kind of text, a collection
+or a title some provider announced (the story words are built in).
+
+A provider sends one message per language it serves when it loads, and
+again when the pipeline asks (it does when it loads itself):
+
+```
+ovos.common_reading.vocabulary.get
+{"langs": ["en-us", "da-dk"]}
+```
+
+```
+ovos.common_reading.vocabulary
+{
+  "skill_id": "<provider skill id>",
+  "lang": "en-us",
+  "content_types": {"horoscope": ["horoscope", "horoscopes", "astrology"]},
+  "collections": ["grimm", "brothers grimm", "the brothers grimm"],
+  "titles": ["The Frog Prince", "Rapunzel"]
+}
+```
+
+- `content_types`: canonical name -> the words for it in this
+  language, all inflections you want recognised ("horoskop",
+  "horoskopet"). The canonical name is what the search carries as
+  `content_type`. Story providers can leave it out: "story", "tale",
+  "fairy tale" and their equivalents in the 8 languages are built in
+  (canonical `"story"`).
+- `collections`: the friendly names (below) in this language.
+- `titles`: optional. What the `-low` stage recognises as a bare title
+  ("tell me the little mermaid"). Leave out titles that are also
+  everyday phrases.
+
+On shutdown a provider can send `{"skill_id": ..., "remove": true}` so
+its words stop being claimed.
 
 ### Friendly names
 

@@ -74,3 +74,36 @@ def plugin(monkeypatch):
     monkeypatch.setattr(CommonReadingPipeline, "lang", "en-us", raising=False)
     p._init_state()
     return p
+
+
+def announce(plugin, skill_id, lang="en-us", content_types=None, collections=None, titles=None):
+    """What a provider sends when it loads: ovos.common_reading.vocabulary."""
+    plugin._handle_vocabulary(Message(_module.COMMON_READING_VOCABULARY, {
+        "skill_id": skill_id, "lang": lang, "content_types": content_types or {},
+        "collections": collections or [], "titles": titles or []}))
+
+
+ALL_LANGS = ["en-us", "da-dk", "de-de", "es-es", "fr-fr", "it-it", "nl-nl", "pt-pt"]
+
+
+def announce_typical_providers(plugin):
+    """A realistic set: story collections with a few titles, a horoscope,
+    an almanac, a blog and an archive of articles."""
+    for lang in ALL_LANGS:
+        announce(plugin, "grimm.test", lang, collections=["grimm", "brothers grimm", "brødrene grimm"],
+                 titles=["Rapunzel", "Cinderella"] if lang == "en-us" else [])
+        announce(plugin, "andersen.test", lang, collections=["andersen", "hans christian andersen", "h c andersen"])
+    announce(plugin, "andersen.test", "en-us", collections=["andersen", "hans christian andersen"],
+             titles=["The Little Mermaid", "The Ugly Duckling", "The Snow Queen", "The Tinderbox"])
+    announce(plugin, "andersen.test", "da-dk", collections=["andersen", "h c andersen"],
+             titles=["Den lille havfrue", "Den grimme ælling"])
+    # French literary short story ("une nouvelle"); never "les nouvelles" (the news)
+    announce(plugin, "cosquin.test", "fr-fr", collections=["cosquin"],
+             content_types={"story": ["nouvelle"]})
+    announce(plugin, "horoscope.test", "en-us", content_types={"horoscope": ["horoscope", "horoscopes"]})
+    announce(plugin, "horoscope.test", "da-dk", content_types={"horoscope": ["horoskop", "horoskopet"]})
+    announce(plugin, "almanac.test", "en-us", content_types={"almanac": ["almanac"]})
+    announce(plugin, "blog.test", "en-us", content_types={"post": ["post", "posts", "blog post"],
+                                                         "article": ["article", "articles"]},
+             collections=["ovosblog", "ovos blog"])
+    announce(plugin, "archive.test", "en-us", collections=["archive"])

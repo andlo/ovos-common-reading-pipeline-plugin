@@ -1,0 +1,56 @@
+{
+  "verbs": [
+    "conta me",
+    "conta nos",
+    "le me",
+    "le nos",
+    "conta",
+    "le",
+    "podes contar me",
+    "podes contar nos",
+    "podes ler me",
+    "podes ler nos",
+    "podias contar me",
+    "podias ler me",
+    "encontra"
+  ],
+  "suffixes": [
+    "por favor"
+  ],
+  "about": [
+    "sobre",
+    "chamado",
+    "chamada"
+  ],
+  "from": [
+    "de",
+    "por"
+  ],
+  "filler": [
+    "um",
+    "uma",
+    "o",
+    "a",
+    "os",
+    "as",
+    "outra",
+    "outro",
+    "minha",
+    "meu",
+    "de hoje"
+  ],
+  "latest": [
+    "ultimo",
+    "ultima",
+    "mais recente"
+  ],
+  "content_types": {
+    "story": [
+      "historia",
+      "historias",
+      "conto",
+      "contos",
+      "historia para dormir"
+    ]
+  }
+}

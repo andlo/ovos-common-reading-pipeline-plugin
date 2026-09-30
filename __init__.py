@@ -52,7 +52,9 @@ touch another user's story.
 """
 
 
+import difflib
 import inspect
+import json
 import math
 import os
 import random
@@ -68,7 +70,7 @@ from ovos_bus_client.client import MessageBusClient
 from ovos_bus_client.message import Message, dig_for_message
 from ovos_bus_client.session import Session, SessionManager
 from ovos_bus_client.util import get_message_lang
-from ovos_plugin_manager.templates.pipeline import PipelinePlugin, IntentHandlerMatch
+from ovos_plugin_manager.templates.pipeline import ConfidenceMatcherPipeline, IntentHandlerMatch
 from ovos_utils.fakebus import FakeBus
 from ovos_workshop.app import OVOSAbstractApplication
 from ovos_workshop.skills import ovos as _workshop_skill
@@ -98,19 +100,40 @@ COMMON_READING_FETCH_CONTENT_RESPONSE = "ovos.common_reading.fetch_content.respo
 # stays silent here too.
 COMMON_READING_PING = "ovos.common_reading.ping"
 COMMON_READING_PONG = "ovos.common_reading.pong"
+# Vocabulary: what a provider can read, in words people use. A provider
+# emits COMMON_READING_VOCABULARY once per language it serves when it loads,
+# and again whenever the pipeline asks with COMMON_READING_VOCABULARY_GET
+# ({"langs": [...]}, sent when the pipeline loads). Payload:
+#   {"skill_id": ..., "lang": "en-us",
+#    "content_types": {"horoscope": ["horoscope", "horoscopes"]},  # canonical -> words
+#    "collections": ["grimm", "brothers grimm"],                      # names of the collection
+#    "titles": ["The Little Mermaid", ...]}                           # optional
+# {"skill_id": ..., "remove": true} forgets a provider. See README.md.
+COMMON_READING_VOCABULARY = "ovos.common_reading.vocabulary"
+COMMON_READING_VOCABULARY_GET = "ovos.common_reading.vocabulary.get"
 
 SEARCH_TIMEOUT = 2.0  # seconds to wait for provider skills to answer a search
+# ...and when none has answered by then, how much longer to wait for the
+# first answer (a busy device, a provider matching a long title list), and
+# how long to collect after it. Costs nothing when answers come in time.
+SEARCH_GRACE = 3.0
+SEARCH_SETTLE = 0.5
 FETCH_TIMEOUT = 10.0  # seconds to wait for the winning provider to deliver text
 PING_TIMEOUT = 0.3  # seconds - short, since a pong is cheap (no index lookup)
 CONFIDENCE_THRESHOLD = 0.8  # provider search-response confidence needed to skip "is it that one?"
 MATCH_CONFIDENCE_THRESHOLD = 0.5  # padacioso utterance-match confidence needed to engage at all
+# match_low: how close a bare title ("tell me the little mermaid") must be to
+# a title a provider announced. Short titles must match exactly.
+TITLE_MATCH_THRESHOLD = 0.88
+TITLE_FUZZY_MIN_LENGTH = 8
+# locale/<lang>/reading.json - the words that take a request apart
+# (scripts/build_reading_words.py)
+READING_WORDS = "reading.json"
 
 # maps our internal intent names -> the *.intent file each is trained from
+# Only "continue" and "pause" are fixed sentences; a reading request is
+# taken apart by _analyze() against the providers' vocabulary instead.
 INTENT_FILES = {
-    "read_content": "ReadContent.intent",
-    "read_by_collection": "ReadContentByCollection.intent",
-    "read_by_type": "ReadContentByType.intent",
-    "read_any_story": "ReadAnyStory.intent",
     "continue": "continue.intent",
     "pause": "pause.intent",
 }
@@ -406,6 +429,21 @@ def migrate_bookmark(paragraphs: List[str], legacy_index: int) -> int:
     return index
 
 
+def _norm(text: str) -> str:
+    """_fold(), with hyphens and apostrophes as spaces and other
+    punctuation dropped: "Raconte-moi l'histoire!" -> "raconte moi l
+    histoire". Utterances and every word list go through this."""
+    text = _fold(text)
+    text = re.sub(r"[-'’`]", " ", text)
+    text = re.sub(r"[^\w\s]", " ", text)
+    return " ".join(text.split())
+
+
+def _lang_key(lang) -> str:
+    """"en-US"/"en_us" -> "en-us"; the key vocabulary is stored under."""
+    return str(lang or "en-us").lower().replace("_", "-")
+
+
 def _fold(text: str) -> str:
     """Lower case, accents off, spaces collapsed: "Latest  NEWS" and
     "latest news" compare equal, whichever way padacioso handed it over."""
@@ -462,18 +500,20 @@ class _Reading:
         self.thread: Optional[threading.Thread] = None
 
 
-class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
+class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
                  config: Optional[Dict] = None):
         OVOSAbstractApplication.__init__(
             self, bus=bus, skill_id="ovos-common-reading-pipeline-plugin.andlo",
             resources_dir=dirname(__file__))
-        PipelinePlugin.__init__(self, bus, config)
+        ConfidenceMatcherPipeline.__init__(self, bus, config)
         self._init_state()
         self._migrate_flat_settings()
         self._register_intent_handlers()
+        self.add_event(COMMON_READING_VOCABULARY, self._handle_vocabulary)
         self._warm_up_intent_containers()
+        self._request_vocabulary()
 
     def _init_state(self):
         """In-memory state, kept apart from __init__ so the tests can set up
@@ -485,6 +525,12 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         self._intent_containers = {}  # locale folder name -> trained padacioso IntentContainer
         self._containers_lock = threading.Lock()
         self._news_words = {}  # locale folder name -> the phrases of its news.voc
+        # provider vocabulary: skill_id -> lang key -> {"content_types",
+        # "collections", "titles"}, as announced (see COMMON_READING_VOCABULARY)
+        self._vocab: Dict[str, Dict[str, dict]] = {}
+        self._vocab_lock = threading.Lock()
+        self._indexes = {}  # lang key -> _index() result, dropped when vocabulary changes
+        self._reading_words_cache = {}  # locale folder name -> reading.json, normalised
         self._rejected_options = set()  # (key, value) already warned about
 
     def _register_intent_handlers(self):
@@ -750,63 +796,250 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
                 return True
         return False
 
-    def match(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
-        """Classify the utterance and decide whether to claim it. Nothing
-        else: no search, no speech, no waiting.
+    # --- vocabulary (what providers can read) ---------------------------------
 
-        This used to run the whole request in here - the provider search
-        (a 2 s window), the "is it that one?" question and the entire
-        story, sentence by sentence. ovos-core 3.7 bounds every match()
-        call to 10 s on a pool of 4 workers and skips a session whose
-        previous call is still running, so after 10 s the utterance fell
-        through to the later pipeline stages (an LLM answered it too) while
-        the story kept reading on an abandoned worker, and "pause" or
-        "continue" could not reach this plugin while its own story ran. The
-        work now happens in the handler ovos-core dispatches to (see
-        handle_read_content and friends), and match() answers in
-        milliseconds once the language's intents are trained.
+    def _request_vocabulary(self):
+        """Ask the providers that are already loaded for their vocabulary.
+        Providers that load later announce it themselves."""
+        try:
+            langs = [self.core_lang] + list(self.secondary_langs)
+        except Exception:
+            langs = []
+        try:
+            self.bus.emit(Message(COMMON_READING_VOCABULARY_GET, {"langs": langs}))
+        except Exception as e:
+            self.log.debug(f"could not request vocabulary: {e}")
 
-        "continue" and "pause" are declined rather than claimed when they
-        make no sense for THIS session - nothing to resume, nothing being
-        read - so a later pipeline stage gets its chance instead. Another
-        user's story on the same hub does not count. A request for the news
-        is declined the same way (see NEWS_VOC)."""
-        container = self._get_intent_container(lang)
+    def _handle_vocabulary(self, message: Message):
+        """A provider says what it can read in one language (or that it
+        is gone). Stored as announced; _index() normalises it."""
+        data = message.data or {}
+        skill_id = data.get("skill_id")
+        if not skill_id:
+            return
+        with self._vocab_lock:
+            if data.get("remove"):
+                self._vocab.pop(skill_id, None)
+            else:
+                entry = {
+                    "content_types": {str(k): [str(w) for w in (v or [])]
+                                      for k, v in (data.get("content_types") or {}).items()},
+                    "collections": [str(c) for c in (data.get("collections") or [])],
+                    "titles": [str(t) for t in (data.get("titles") or [])],
+                }
+                self._vocab.setdefault(skill_id, {})[_lang_key(data.get("lang"))] = entry
+            self._indexes.clear()
+
+    def _reading_words(self, lang) -> dict:
+        """locale/<lang>/reading.json, every word normalised and every
+        list sorted longest first (so "tell me" wins over "tell")."""
+        lang_dir = self._locale_dir_for(lang)
+        key = os.path.basename(lang_dir)
+        if key not in self._reading_words_cache:
+            path = os.path.join(lang_dir, READING_WORDS)
+            raw = {}
+            if os.path.isfile(path):
+                with open(path, encoding="utf-8") as f:
+                    raw = json.load(f)
+
+            def words(name):
+                return sorted({_norm(w) for w in raw.get(name, []) if _norm(w)}, key=len, reverse=True)
+
+            self._reading_words_cache[key] = {
+                "verbs": words("verbs"),
+                "suffixes": words("suffixes"),
+                "edges": sorted({*words("about"), *words("from"), *words("filler"), *words("latest")},
+                                key=len, reverse=True),
+                "content_types": {canon: [_norm(w) for w in forms if _norm(w)]
+                                  for canon, forms in (raw.get("content_types") or {}).items()},
+            }
+        return self._reading_words_cache[key]
+
+    def _strip_edges(self, text: str, lang) -> str:
+        """Drop articles, connectors and the like from both ends of a
+        title: "the little mermaid" -> "little mermaid", "about the moon
+        from" -> "moon"."""
+        edges = self._reading_words(lang)["edges"]
+        changed = True
+        while text and changed:
+            changed = False
+            for w in edges:
+                if text == w:
+                    return ""
+                if text.startswith(w + " "):
+                    text, changed = text[len(w) + 1:], True
+                    break
+                if text.endswith(" " + w):
+                    text, changed = text[:-len(w) - 1], True
+                    break
+        return text.strip()
+
+    def _index(self, lang) -> dict:
+        """What can be read in this language, from the pipeline's own story
+        words and every provider's announcement for the same language."""
+        key = _lang_key(lang)
+        with self._vocab_lock:
+            if key in self._indexes:
+                return self._indexes[key]
+            primary = key.split("-")[0]
+            content = {}   # normalised word -> canonical content type
+            for canon, forms in self._reading_words(lang)["content_types"].items():
+                for form in forms:
+                    content.setdefault(form, canon)
+            collections = {}  # normalised name -> name as announced
+            titles = {}  # title without articles -> title as announced
+            for per_lang in self._vocab.values():
+                for vlang, entry in per_lang.items():
+                    if vlang.split("-")[0] != primary:
+                        continue
+                    for canon, forms in entry["content_types"].items():
+                        for form in [canon] + forms:
+                            if _norm(form):
+                                content.setdefault(_norm(form), canon)
+                    for name in entry["collections"]:
+                        if _norm(name):
+                            collections.setdefault(_norm(name), name)
+                    for title in entry["titles"]:
+                        stripped = self._strip_edges(_norm(title), lang)
+                        if stripped:
+                            titles.setdefault(stripped, title)
+            index = {"content": sorted(content.items(), key=lambda kv: len(kv[0]), reverse=True),
+                     "collections": sorted(collections.items(), key=lambda kv: len(kv[0]), reverse=True),
+                     "titles": titles}
+            self._indexes[key] = index
+            return index
+
+    @staticmethod
+    def _find_first(text: str, items, suffix=""):
+        """The leftmost of `items` ((word, value) pairs) in `text` as a whole
+        word, longest first on a tie: (start, end, word, value) or None.
+        Leftmost, so a kind of text named before the title wins over one
+        that is part of it ("a story about a fairy tale princess")."""
+        best = None
+        for word, value in items:
+            m = re.search(rf"(?<!\w){re.escape(word)}{suffix}(?!\w)", text)
+            if m and (best is None or m.start() < best[0]):
+                best = (m.start(), m.end(), word, value)
+        return best
+
+    def _analyze(self, utterance: str, lang) -> Optional[dict]:
+        """Take a reading request apart: {"content_type", "collection",
+        "title"} (each None when not said), or None when the sentence does
+        not open with a reading verb. Nothing here decides whether to claim
+        it - see match_high() and match_low()."""
+        words = self._reading_words(lang)
+        text = _norm(utterance)
+        verb = next((v for v in words["verbs"] if text == v or text.startswith(v + " ")), None)
+        if verb is None:
+            return None
+        rest = text[len(verb):].strip()
+        changed = True
+        while rest and changed:
+            changed = False
+            for suffix in words["suffixes"]:
+                if rest == suffix or rest.endswith(" " + suffix):
+                    rest, changed = rest[:len(rest) - len(suffix)].strip(), True
+                    break
+        index = self._index(lang)
+        content_type = None
+        hit = self._find_first(rest, index["content"])
+        if hit:
+            content_type = hit[3]
+            rest = f"{rest[:hit[0]]} {rest[hit[1]:]}".strip()
+        collection = None
+        # "grimm", "grimm's", Danish "grimms"
+        hit = self._find_first(rest, index["collections"], suffix=r"(?: ?s)?")
+        if hit:
+            collection = hit[3]
+            rest = f"{rest[:hit[0]]} {rest[hit[1]:]}".strip()
+        title = self._strip_edges(" ".join(rest.split()), lang) or None
+        return {"content_type": content_type, "collection": collection, "title": title}
+
+    def _known_title(self, title: Optional[str], lang) -> Optional[str]:
+        """The announced title `title` names, or None. Exact after dropping
+        articles; close (TITLE_MATCH_THRESHOLD) only for longer titles, so
+        "the time" never passes for a tale called "The Tinderbox"."""
+        if not title:
+            return None
+        titles = self._index(lang)["titles"]
+        if title in titles:
+            return titles[title]
+        if len(title) < TITLE_FUZZY_MIN_LENGTH:
+            return None
+        close = difflib.get_close_matches(title, titles.keys(), n=1, cutoff=TITLE_MATCH_THRESHOLD)
+        return titles[close[0]] if close else None
+
+    def _claim(self, name: str, entities: dict, utterance: str) -> IntentHandlerMatch:
+        # match_data=entities (not the default None) is not optional:
+        # ovos-core's handle_utterance does data.update(match.match_data)
+        # unconditionally (a real crash found via live testing), and it is
+        # how the entities reach the handler.
+        return IntentHandlerMatch(match_type=f"{self.skill_id}:{name}",
+                                  match_data={k: v for k, v in entities.items() if v},
+                                  skill_id=self.skill_id, utterance=utterance)
+
+    # --- matching (ovos-core calls these; see README "Pipeline stages") -------
+
+    def match_high(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
+        """A request that names something a provider can read: a kind of
+        text ("a story", "my horoscope", "an article about ...") or a
+        collection ("a story from grimm"). Also "continue"/"pause".
+
+        Only classifies - no search, no speech, no waiting: ovos-core
+        bounds every match() call (10 s on a small pool) and the work
+        happens in the handler it dispatches to (handle_read_content and
+        friends).
+
+        "tell me the weather" / "tell me the time" name neither, so they
+        are left to the skills they belong to (issue #50). A bare title is
+        match_low()'s, after the skills' own intents have had their turn."""
         session_id = _session_id(message)
+        container = self._get_intent_container(lang)
         for utterance in utterances:
             result = container.calc_intent(utterance)
             name = result.get("name")
-            if not name or result.get("conf", 0) < MATCH_CONFIDENCE_THRESHOLD:
-                continue
-            if name not in INTENT_HANDLERS:
-                continue
-            if name == "continue" and not (self._is_reading(session_id) or self._last_content(session_id)):
-                # nothing in progress in this session - decline rather than
-                # claim the utterance, so a later pipeline stage gets a
-                # chance instead
-                continue
-            if name == "pause" and not self._is_reading(session_id):
-                # nothing being read in this session right now - same
-                # decline-rather-than-claim reasoning as "continue" above
-                continue
-            entities = result.get("entities") or {}
-            if self._asks_for_news(entities, lang):
-                continue
+            if name in ("continue", "pause") and result.get("conf", 0) >= MATCH_CONFIDENCE_THRESHOLD:
+                if name == "continue" and not (self._is_reading(session_id) or self._last_content(session_id)):
+                    # nothing in progress in this session - decline, so a
+                    # later pipeline stage gets its chance
+                    continue
+                if name == "pause" and not self._is_reading(session_id):
+                    continue
+                return self._claim(name, {}, utterance)
 
-            # match_data=entities (not the default None) is not
-            # optional: a real crash found via live testing.
-            # IntentHandlerMatch.match_data defaults to None when not
-            # given explicitly, and ovos-core's own handle_utterance
-            # does `data.update(match.match_data)` on it unconditionally
-            # - None isn't iterable, so that line raised TypeError and
-            # the match was silently discarded, falling through to
-            # common-query/fallback instead. Passing the already-
-            # extracted entities dict here fixes the crash, and it is
-            # also how the entities reach the handler: ovos-core merges
-            # match_data into the dispatch message's data.
-            return IntentHandlerMatch(match_type=f"{self.skill_id}:{name}",
-                                       match_data=dict(entities),
-                                       skill_id=self.skill_id, utterance=utterance)
+            parts = self._analyze(utterance, lang)
+            if not parts or not (parts["content_type"] or parts["collection"]):
+                continue
+            if self._asks_for_news(parts, lang):
+                continue
+            # a title a provider announced goes out the way it was announced
+            parts["title"] = self._known_title(parts["title"], lang) or parts["title"]
+            if parts["collection"]:
+                name = "read_by_collection"
+            elif parts["title"]:
+                name = "read_content"
+            elif parts["content_type"] == ANY_STORY_CONTENT_TYPE:
+                name = "read_any_story"
+            else:
+                name = "read_by_type"
+            return self._claim(name, parts, utterance)
+        return None
+
+    def match_medium(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
+        return None
+
+    def match_low(self, utterances: List[str], lang: str, message: Message) -> Optional[IntentHandlerMatch]:
+        """A bare title ("tell me the little mermaid", "læs den grimme
+        ælling"), claimed only when a provider announced that title. Meant
+        to sit after padatious/adapt in the pipeline, so a skill whose own
+        intent matches the sentence gets it first."""
+        for utterance in utterances:
+            parts = self._analyze(utterance, lang)
+            if not parts or parts["content_type"] or parts["collection"]:
+                continue
+            title = self._known_title(parts["title"], lang)
+            if title and not self._asks_for_news({"title": title}, lang):
+                return self._claim("read_content", {"title": title}, utterance)
         return None
 
     # --- intent handlers (ovos-core dispatches "<skill_id>:<intent>" here) ---------
@@ -816,20 +1049,18 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
     # "utterance" and "lang", with the requesting session in its context.
 
     def handle_read_content(self, message: Message):
-        self._search_and_read(message, message.data.get("title"))
+        self._search_and_read(message, message.data.get("title"),
+                              content_type=message.data.get("content_type"))
 
     def handle_read_by_collection(self, message: Message):
         self._search_and_read(message, message.data.get("title"),
-                              collection_hint=message.data.get("collection"))
+                              collection_hint=message.data.get("collection"),
+                              content_type=message.data.get("content_type"))
 
     def handle_read_by_type(self, message: Message):
-        # "read me my horoscope" / "tell me today's horoscope" - no {title},
-        # just a content_type ("horoscope", "story", etc) forwarded as a hint
-        # on the search broadcast (see COMMON_READING_SEARCH's "content_type"
-        # field) so provider skills can filter/respond appropriately.
-        # Distinct phrasing ("my"/"today's") deliberately avoids overlapping
-        # with read_content's "the story {title}" patterns - see
-        # ReadContentByType.intent's own comment.
+        # "read me my horoscope" / "tell me today's horoscope" - no title,
+        # just the kind of text, forwarded as the canonical name a provider
+        # announced ("horoscope"), so provider skills can filter on it.
         self._search_and_read(message, None, content_type=message.data.get("content_type"))
 
     def handle_read_any_story(self, message: Message):
@@ -1024,7 +1255,9 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         'something is installed but found nothing' via a lightweight
         ping/pong (see #2), rather than guessing at a fallback
         language or just saying the same generic thing either way."""
-        if self._ping_providers(message):
+        # a provider that announced its vocabulary is installed, even when
+        # it is too busy to pong within PING_TIMEOUT
+        if self._ping_providers(message) or self._vocab:
             if collection_hint:
                 self.speak_dialog('no_such_collection', data={"collection": collection_hint})
             else:
@@ -1179,7 +1412,7 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
         return lang or self.lang
 
     def _collect_replies(self, request: Message, reply_type: str, timeout: float,
-                         first_only: bool = False) -> List[Message]:
+                         first_only: bool = False, grace: float = 0.0) -> List[Message]:
         """Emit `request` and collect the `reply_type` answers to it.
 
         Only answers for the session that asked are taken. Two people on a
@@ -1190,7 +1423,10 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
 
         first_only returns as soon as one answer is in (a fetch has exactly
         one addressee); otherwise answers are collected for the whole window
-        (a search goes to every provider)."""
+        (a search goes to every provider). With `grace`, a window that closes
+        with no answer at all is stretched by up to `grace` seconds for the
+        first one, then SEARCH_SETTLE for the rest: on a busy device the
+        answers came at 2.4 s and the user was told nothing was installed."""
         session_id = _session_id(request)
         replies = []
         answered = threading.Event()
@@ -1209,6 +1445,8 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
                 answered.wait(timeout)
             else:
                 time.sleep(timeout)
+                if grace and not replies and answered.wait(grace):
+                    time.sleep(SEARCH_SETTLE)
         finally:
             self.bus.remove(reply_type, collect)
         return replies
@@ -1224,7 +1462,8 @@ class CommonReadingPipeline(PipelinePlugin, OVOSAbstractApplication):
             "content_type": content_type,
         })
         return [reply.data for reply in
-                self._collect_replies(request, COMMON_READING_SEARCH_RESPONSE, timeout)]
+                self._collect_replies(request, COMMON_READING_SEARCH_RESPONSE, timeout,
+                                      grace=SEARCH_GRACE if timeout >= SEARCH_TIMEOUT else 0.0)]
 
     def _ping_providers(self, message: Optional[Message], timeout=PING_TIMEOUT):
         """Broadcast a lightweight 'is anyone there?' and collect pongs.

@@ -76,3 +76,14 @@ def test_search_and_read_calls_handle_no_candidates_when_nothing_found(plugin):
     plugin._search_and_read(message, "cinderella", collection_hint="grimm")
 
     plugin._handle_no_candidates.assert_called_once_with(message, "grimm")
+
+
+def test_no_pongs_but_announced_vocabulary_is_not_nothing_installed(plugin):
+    """A provider that announced what it can read is installed, even when
+    it is too busy to pong in time."""
+    from conftest import announce
+    announce(plugin, "grimm.test", "en-us", collections=["grimm"])
+    plugin.speak_dialog = MagicMock()
+    plugin._ping_providers = MagicMock(return_value=[])
+    plugin._handle_no_candidates(dispatch_message(), None)
+    plugin.speak_dialog.assert_called_once_with('no_matching_content')

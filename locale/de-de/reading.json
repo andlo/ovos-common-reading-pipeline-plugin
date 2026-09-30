@@ -1,0 +1,75 @@
+{
+  "verbs": [
+    "erzähl mir",
+    "erzähle mir",
+    "erzähl uns",
+    "erzähle uns",
+    "erzähl",
+    "erzähle",
+    "lies mir",
+    "lies uns",
+    "lies",
+    "lies vor",
+    "kannst du mir",
+    "kannst du uns",
+    "könntest du mir",
+    "könntest du uns",
+    "würdest du mir",
+    "würdest du uns",
+    "finde"
+  ],
+  "suffixes": [
+    "bitte",
+    "vor",
+    "erzählen",
+    "vorlesen",
+    "vorlesen bitte"
+  ],
+  "about": [
+    "über",
+    "namens"
+  ],
+  "from": [
+    "von",
+    "aus"
+  ],
+  "filler": [
+    "ein",
+    "eine",
+    "einen",
+    "einem",
+    "der",
+    "die",
+    "das",
+    "den",
+    "dem",
+    "des",
+    "noch",
+    "mir",
+    "uns",
+    "mein",
+    "meine",
+    "meinen",
+    "heutige",
+    "heutigen",
+    "bitte",
+    "andere",
+    "erzählen",
+    "vorlesen"
+  ],
+  "latest": [
+    "neueste",
+    "neuesten",
+    "letzte",
+    "letzten"
+  ],
+  "content_types": {
+    "story": [
+      "geschichte",
+      "geschichten",
+      "märchen",
+      "gutenachtgeschichte",
+      "gutenachtgeschichten"
+    ]
+  }
+}

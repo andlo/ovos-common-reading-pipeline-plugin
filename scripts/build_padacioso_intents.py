@@ -640,16 +640,13 @@ CONTINUE = {
     "pt-pt": ["Continua a história", "Continua a ler", "Continua"],
 }
 
-for lang, lines in READ_CONTENT.items():
-    (ROOT / lang / "ReadContent.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
-for lang, lines in READ_BY_COLLECTION.items():
-    (ROOT / lang / "ReadContentByCollection.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
-for lang, lines in READ_CONTENT_BY_TYPE.items():
-    (ROOT / lang / "ReadContentByType.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
-for lang, lines in READ_ANY_STORY.items():
-    (ROOT / lang / "ReadAnyStory.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
+# Since 0.3.0 only continue.intent is still a padacioso intent: a reading
+# request is taken apart against reading.json and the providers' announced
+# vocabulary instead (scripts/build_reading_words.py, README "How a request
+# is recognised"). READ_CONTENT & co. above are kept as the record of the
+# phrasings that were tested - their verbs and connectors now live in
+# build_reading_words.py.
 for lang, lines in CONTINUE.items():
     (ROOT / lang / "continue.intent").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-print("Rewrote ReadContent.intent, ReadContentByCollection.intent, ReadContentByType.intent (en-us/da-dk only), "
-      "ReadAnyStory.intent, continue.intent")
+print("Rewrote continue.intent")

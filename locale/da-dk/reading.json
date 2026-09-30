@@ -1,0 +1,90 @@
+{
+  "verbs": [
+    "fortæl mig",
+    "fortæl os",
+    "fortæl",
+    "læs mig",
+    "læs os",
+    "læs",
+    "læs op",
+    "kan du fortælle mig",
+    "kan du fortælle",
+    "kan du læse mig",
+    "kan du læse",
+    "kunne du fortælle mig",
+    "kunne du fortælle",
+    "kunne du læse mig",
+    "kunne du læse",
+    "vil du fortælle mig",
+    "vil du fortælle",
+    "vil du læse mig",
+    "vil du læse",
+    "fortæl mig venligst",
+    "venligst fortæl mig",
+    "venligst fortæl",
+    "læs mig venligst",
+    "venligst læs mig",
+    "venligst læs",
+    "find"
+  ],
+  "suffixes": [
+    "op for mig",
+    "for mig",
+    "op for os",
+    "for os",
+    "op",
+    "tak",
+    "venligst"
+  ],
+  "about": [
+    "om",
+    "omkring",
+    "for",
+    "der hedder",
+    "kaldet"
+  ],
+  "from": [
+    "fra",
+    "af"
+  ],
+  "filler": [
+    "en",
+    "et",
+    "den",
+    "det",
+    "de",
+    "min",
+    "mit",
+    "mine",
+    "vores",
+    "dagens",
+    "i dag",
+    "noget",
+    "nogle",
+    "anden",
+    "andet",
+    "andre"
+  ],
+  "latest": [
+    "seneste",
+    "nyeste",
+    "den seneste",
+    "det seneste",
+    "den nyeste",
+    "det nyeste"
+  ],
+  "content_types": {
+    "story": [
+      "historie",
+      "historien",
+      "historier",
+      "eventyr",
+      "eventyret",
+      "eventyrene",
+      "godnathistorie",
+      "godnathistorien",
+      "fortælling",
+      "fortællingen"
+    ]
+  }
+}

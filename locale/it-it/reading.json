@@ -1,0 +1,73 @@
+{
+  "verbs": [
+    "raccontami",
+    "raccontaci",
+    "leggimi",
+    "leggici",
+    "racconta",
+    "leggi",
+    "puoi raccontarmi",
+    "puoi raccontarci",
+    "puoi leggermi",
+    "puoi leggerci",
+    "potresti raccontarmi",
+    "potresti raccontarci",
+    "potresti leggermi",
+    "potresti leggerci",
+    "trova"
+  ],
+  "suffixes": [
+    "per favore"
+  ],
+  "about": [
+    "su",
+    "sul",
+    "sulla",
+    "sullo",
+    "sui",
+    "sugli",
+    "sulle",
+    "intitolato",
+    "intitolata"
+  ],
+  "from": [
+    "di",
+    "da",
+    "dei",
+    "dei fratelli"
+  ],
+  "filler": [
+    "un",
+    "una",
+    "uno",
+    "il",
+    "lo",
+    "la",
+    "i",
+    "gli",
+    "le",
+    "l",
+    "un",
+    "altra",
+    "altro",
+    "mia",
+    "mio",
+    "di oggi"
+  ],
+  "latest": [
+    "ultimo",
+    "ultima",
+    "piu recente"
+  ],
+  "content_types": {
+    "story": [
+      "storia",
+      "storie",
+      "fiaba",
+      "fiabe",
+      "favola",
+      "favole",
+      "storia della buonanotte"
+    ]
+  }
+}
