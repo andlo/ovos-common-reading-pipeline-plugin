@@ -131,7 +131,7 @@ def test_match_is_fast_and_does_nothing_but_classify(live):
     elapsed = time.monotonic() - started
 
     assert result.match_type == f"{plugin.skill_id}:read_content"
-    assert result.match_data == {"title": "rapunzel"}
+    assert result.match_data == {"content_type": "story", "title": "rapunzel"}
     assert emitted == [] and sent.messages == []
     # padacioso 1.x (the newest non-pre-release on PyPI) starts a process
     # pool for every calc_intent and takes seconds whatever the plugin does

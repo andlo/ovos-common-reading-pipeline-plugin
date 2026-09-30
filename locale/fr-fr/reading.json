@@ -1,0 +1,81 @@
+{
+  "verbs": [
+    "raconte moi",
+    "raconte nous",
+    "raconte",
+    "lis moi",
+    "lis nous",
+    "lis",
+    "racontez moi",
+    "racontez nous",
+    "lisez moi",
+    "lisez nous",
+    "tu peux me",
+    "tu peux nous",
+    "tu pourrais me",
+    "tu pourrais nous",
+    "peux tu me",
+    "peux tu nous",
+    "pourrais tu me",
+    "pourrais tu nous",
+    "vous pouvez me",
+    "pouvez vous me",
+    "pouvez vous nous",
+    "pourriez vous me",
+    "pourriez vous nous",
+    "trouve"
+  ],
+  "suffixes": [
+    "s il te plait",
+    "s il vous plait",
+    "raconter",
+    "lire"
+  ],
+  "about": [
+    "sur",
+    "a propos de",
+    "intitule",
+    "intitulee"
+  ],
+  "from": [
+    "de",
+    "par"
+  ],
+  "filler": [
+    "un",
+    "une",
+    "le",
+    "la",
+    "les",
+    "l",
+    "des",
+    "du",
+    "d",
+    "autre",
+    "mon",
+    "ma",
+    "mes",
+    "moi",
+    "nous",
+    "d aujourd hui",
+    "raconter",
+    "lire"
+  ],
+  "latest": [
+    "dernier",
+    "derniere",
+    "plus recent",
+    "plus recente"
+  ],
+  "content_types": {
+    "story": [
+      "histoire",
+      "histoires",
+      "conte",
+      "contes",
+      "conte de fees",
+      "contes de fees",
+      "histoire pour dormir"
+    ]
+  }
+}

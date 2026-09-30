@@ -1,0 +1,61 @@
+{
+  "verbs": [
+    "cuéntame",
+    "cuéntanos",
+    "léeme",
+    "léenos",
+    "cuenta",
+    "lee",
+    "puedes contarme",
+    "puedes contarnos",
+    "puedes leerme",
+    "puedes leernos",
+    "podrías contarme",
+    "podrías contarnos",
+    "podrías leerme",
+    "podrías leernos",
+    "busca"
+  ],
+  "suffixes": [
+    "por favor"
+  ],
+  "about": [
+    "sobre",
+    "acerca de",
+    "llamado",
+    "llamada"
+  ],
+  "from": [
+    "de",
+    "por"
+  ],
+  "filler": [
+    "un",
+    "una",
+    "unos",
+    "unas",
+    "el",
+    "la",
+    "los",
+    "las",
+    "otro",
+    "otra",
+    "mi",
+    "me",
+    "de hoy"
+  ],
+  "latest": [
+    "último",
+    "última",
+    "más reciente"
+  ],
+  "content_types": {
+    "story": [
+      "cuento",
+      "cuentos",
+      "historia",
+      "historias",
+      "cuento para dormir"
+    ]
+  }
+}

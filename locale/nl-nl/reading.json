@@ -1,0 +1,62 @@
+{
+  "verbs": [
+    "vertel me",
+    "vertel mij",
+    "vertel ons",
+    "vertel",
+    "lees me",
+    "lees mij",
+    "lees ons",
+    "lees",
+    "lees voor",
+    "kun je me",
+    "kun je mij",
+    "kun je ons",
+    "kan je me",
+    "kan je mij",
+    "kan je ons",
+    "wil je me",
+    "wil je mij",
+    "wil je ons",
+    "zoek"
+  ],
+  "suffixes": [
+    "voor",
+    "vertellen",
+    "voorlezen",
+    "alsjeblieft",
+    "alstublieft"
+  ],
+  "about": [
+    "over",
+    "genaamd"
+  ],
+  "from": [
+    "van",
+    "uit"
+  ],
+  "filler": [
+    "een",
+    "het",
+    "de",
+    "nog",
+    "mijn",
+    "ons",
+    "van vandaag",
+    "vertellen",
+    "voorlezen"
+  ],
+  "latest": [
+    "nieuwste",
+    "laatste"
+  ],
+  "content_types": {
+    "story": [
+      "verhaal",
+      "verhaaltje",
+      "verhalen",
+      "sprookje",
+      "sprookjes"
+    ]
+  }
+}

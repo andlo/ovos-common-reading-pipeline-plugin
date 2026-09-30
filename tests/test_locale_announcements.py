@@ -4,6 +4,7 @@ _describe() hard-coded "by", "from", "sourced from", "machine translated",
 and the closing line fell back to "the source". Those words now come from
 the locale, so a French or German story is announced in French or German
 from start to end."""
+import json
 import re
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -44,8 +45,10 @@ def test_every_locale_ships_the_announcement_dialogs(lang, dialog):
 
 
 @pytest.mark.parametrize("lang", LOCALES)
-def test_every_locale_ships_the_any_story_intent(lang):
-    assert (Path(REPO_ROOT) / "locale" / lang / "ReadAnyStory.intent").is_file()
+def test_every_locale_ships_its_reading_words(lang):
+    """verbs to open a request, and the story words (see reading.json)"""
+    words = json.loads((Path(REPO_ROOT) / "locale" / lang / "reading.json").read_text(encoding="utf-8"))
+    assert words["verbs"] and words["content_types"]["story"]
 
 
 def test_french_description_reads_naturally(plugin, monkeypatch):

@@ -1,0 +1,89 @@
+{
+  "verbs": [
+    "tell me",
+    "tell us",
+    "tell",
+    "read me",
+    "read us",
+    "read",
+    "read to me",
+    "read out",
+    "can you tell me",
+    "can you tell",
+    "can you read me",
+    "can you read",
+    "could you tell me",
+    "could you tell",
+    "could you read me",
+    "could you read",
+    "would you tell me",
+    "would you tell",
+    "would you read me",
+    "would you read",
+    "please tell me",
+    "please tell",
+    "please read me",
+    "please read",
+    "find"
+  ],
+  "suffixes": [
+    "please",
+    "to me",
+    "for me",
+    "to us",
+    "for us",
+    "out loud",
+    "aloud"
+  ],
+  "about": [
+    "about",
+    "regarding",
+    "on",
+    "of",
+    "for",
+    "called",
+    "named"
+  ],
+  "from": [
+    "from",
+    "by"
+  ],
+  "filler": [
+    "a",
+    "an",
+    "the",
+    "some",
+    "another",
+    "other",
+    "one",
+    "me",
+    "my",
+    "our",
+    "today",
+    "todays",
+    "today s",
+    "daily",
+    "any",
+    "something"
+  ],
+  "latest": [
+    "latest",
+    "newest",
+    "most recent",
+    "recent"
+  ],
+  "content_types": {
+    "story": [
+      "story",
+      "stories",
+      "tale",
+      "tales",
+      "fairy tale",
+      "fairy tales",
+      "fairytale",
+      "fairytales",
+      "bedtime story",
+      "bedtime stories"
+    ]
+  }
+}
