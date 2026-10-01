@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 from ovos_bus_client.session import Session
 
-from conftest import CommonReadingPipeline, REPO_ROOT, dispatch_message, use_real_dialogs
+from conftest import report_end, CommonReadingPipeline, REPO_ROOT, dispatch_message, use_real_dialogs
 
 LOCALES = sorted(p.name for p in (Path(REPO_ROOT) / "locale").iterdir() if p.is_dir())
 SOURCE = "Project Gutenberg"
@@ -47,6 +47,7 @@ def _listen(plugin, narration=None, on_line=None):
         heard.append(utterance)
         if on_line:
             on_line(utterance)
+        report_end(plugin)  # said, and the client says so
 
     plugin.speak = MagicMock(side_effect=hear)
     plugin._speak_ssml = MagicMock(side_effect=hear)

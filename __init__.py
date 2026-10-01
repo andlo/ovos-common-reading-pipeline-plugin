@@ -202,6 +202,20 @@ MIN_CLAUSE_CHARS = 40
 SPOKEN_CHARS_PER_SECOND = 14
 SPOKEN_WAIT_MARGIN = 3  # seconds
 MAX_SPOKEN_WAIT = 15  # seconds, what speak(wait=True) waits
+# How many sentences a client may hold that it has not finished saying. One
+# was the whole story's pace: each sentence waited out the round trip to the
+# client and its synthesis before it could start. A few ahead let the client
+# start the next the moment one ends. More would be a client buffering a
+# story it may never read: a phone on vibrate ended every sentence unsaid,
+# and the reader, waiting for nothing else, sent a hundred in ten seconds.
+# "read_ahead" in the config or settings (see _option); 1 is the old pace.
+READ_AHEAD = 3
+# No sentence is over sooner than this fast a voice could say it, whatever
+# the client reports. Ends from a client that is not saying anything arrive
+# within milliseconds; held to this, a story it skips runs at about reading
+# speed instead of emptying in seconds. "fastest_chars_per_second" in the
+# config or settings; the configured chars_per_second wins when it is faster.
+FASTEST_CHARS_PER_SECOND = 30
 # Bumped whenever sentence splitting changes what a bookmark index points at,
 # so bookmarks written by an older splitter can be carried over (see
 # migrate_bookmark) instead of resuming a few sentences off.
@@ -500,6 +514,92 @@ class _Reading:
         self.thread: Optional[threading.Thread] = None
 
 
+class _ReadAhead:
+    """Which of a story's sentences a client holds and has not finished saying.
+
+    `sent` as each sentence goes out, `wait_for_room` before the next, and
+    each audio_output_end from the story's session to `ended`, which finishes
+    the oldest. A sentence's clock starts when the one before it is over: one
+    the client never reports on is over its spoken_wait later, and none is
+    over sooner than a voice at `fastest` characters a second could say it,
+    whatever the client reports. `finished` counts the sentences that are
+    over, which is what the bookmark records."""
+
+    def __init__(self, size: int, fastest: float = FASTEST_CHARS_PER_SECOND,
+                 clock=time.monotonic, pause=None):
+        self.size = max(1, int(size))
+        self.fastest = fastest
+        self.clock = clock
+        # How to wait for the clock to move; tests pass one that moves it.
+        self._pause = pause
+        self.finished = 0
+        self._held = []  # dicts: sent, shortest, longest, start, ended
+        self._last_over = None
+        self._changed = threading.Condition()
+
+    def sent(self, text: str, wait_seconds: float):
+        with self._changed:
+            self._held.append({"sent": self.clock(), "shortest": len(text) / self.fastest,
+                               "longest": float(wait_seconds), "start": None, "ended": None})
+
+    def ended(self):
+        with self._changed:
+            for held in self._held:
+                if held["ended"] is None:
+                    held["ended"] = self.clock()
+                    break
+            self._changed.notify_all()
+
+    @property
+    def heard(self) -> int:
+        """The sentences the client is done with: those over, and those it
+        reported the end of that are only held to the pace. The floor paces
+        what is sent; it never decides what was heard."""
+        with self._changed:
+            reported = 0
+            for held in self._held:
+                if held["ended"] is None:
+                    break
+                reported += 1
+            return self.finished + reported
+
+    def _over_at(self, held) -> float:
+        """When the front sentence is over: reported (or timed out), and
+        not before it could have been said."""
+        if held["start"] is None:
+            held["start"] = held["sent"] if self._last_over is None else max(held["sent"], self._last_over)
+        reported = held["ended"] if held["ended"] is not None else held["start"] + held["longest"]
+        return max(reported, held["start"] + held["shortest"])
+
+    def _release(self, now):
+        while self._held:
+            over = self._over_at(self._held[0])
+            if now < over:
+                return over
+            self._held.pop(0)
+            self._last_over = over
+            self.finished += 1
+        return None
+
+    def wait_for_room(self, stopped: threading.Event, until_empty: bool = False):
+        """Block until another sentence may go out (or, with `until_empty`,
+        until every one held is over), or until `stopped` is set."""
+        limit = 0 if until_empty else self.size - 1
+        with self._changed:
+            while not stopped.is_set():
+                now = self.clock()
+                due = self._release(now)
+                if len(self._held) <= limit:
+                    return
+                # Woken by ended(); otherwise when the front one is due, and
+                # never longer than a second, so a stop is noticed.
+                seconds = max(0.01, min(1.0, due - now))
+                if self._pause is not None:
+                    self._pause(seconds)
+                else:
+                    self._changed.wait(seconds)
+
+
 class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
 
     def __init__(self, bus: Optional[Union[MessageBusClient, FakeBus]] = None,
@@ -532,6 +632,7 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         self._indexes = {}  # lang key -> _index() result, dropped when vocabulary changes
         self._reading_words_cache = {}  # locale folder name -> reading.json, normalised
         self._rejected_options = set()  # (key, value) already warned about
+        self._read_ahead_timing = {}  # clock/pause for _ReadAhead; tests make time virtual
 
     def _register_intent_handlers(self):
         """Register a handler for every match type match() can return.
@@ -1129,6 +1230,7 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         flight, i.e. to the session that asked."""
         if self._stop_reading(session.session_id) is None:
             return False
+        self._drop_read_ahead()
         self._deactivate()
         self._speak_dialog_and_wait('stop_reading')
         self._store_settings()
@@ -1158,9 +1260,24 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         self._store_settings()
         return bool(readings)
 
+    def _drop_read_ahead(self):
+        """Tell the client to drop the sentences it holds and has not said.
+
+        Up to READ_AHEAD - 1 of them wait on the client behind the one being
+        said; told "pause", it would read them out after "Paused". This is
+        OVOS's own "stop speaking" (ovos-audio flushes its queue on it), sent
+        to the session of the message in flight, i.e. the one that asked,
+        before the confirmation, so the confirmation is not what it drops."""
+        message = dig_for_message()
+        stop = message.forward("mycroft.audio.speech.stop", {}) if message \
+            else Message("mycroft.audio.speech.stop")
+        stop.context["skill_id"] = self.skill_id
+        self.bus.emit(stop)
+
     def _confirm_stop(self, message: Optional[Message]):
         """Deactivate and say 'stop_reading' to the session `message` came
         from (a local named `message` is how speak() finds its context)."""
+        self._drop_read_ahead()
         self._deactivate(message)
         self._speak_dialog_and_wait('stop_reading')
 
@@ -1188,6 +1305,7 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         It waits for the dialog for the same reason as stop_session() - see
         the comment there."""
         if self._stop_reading(_session_id(message)) is not None:
+            self._drop_read_ahead()
             self._deactivate(message)
         self._speak_dialog_and_wait('paused')
         self._store_settings()
@@ -1604,30 +1722,48 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
             versions = self._session_entry(reading.session_id, create=True)["progress_splitter"]
             if bookmark and versions.get(key) != SPLITTER_VERSION:
                 bookmark = migrate_bookmark(paragraphs, bookmark)
-        for i, sentence in enumerate(sentences[bookmark:], start=bookmark):
-            if reading.stopped.is_set():
-                break
-            # speak(), not speak_dialog(): the dialog renderer treats its
-            # argument as a template name and, finding none, speaks the name
-            # with every '.' replaced by a space - the full stop that ends
-            # the sentence, "Mr. Fox", "3.5" - and a sentence that happens to
-            # equal a dialog name would be swapped for that dialog.
-            if narrating:
-                pause = STORY_START_BREAK_MS if i == bookmark else \
-                    PARAGRAPH_BREAK_MS if i in paragraph_starts else 0
-                self._speak_ssml(sentence, narrate(sentence, pause), wait=self._spoken_wait(sentence))
-            else:
-                self.speak(sentence, wait=self._spoken_wait(sentence))
-            # only marked done AFTER actually speaking it - if pause
-            # sets the stop flag while this sentence is mid-speech,
-            # speak(wait=...) still finishes it before returning, so
-            # the bookmark correctly reflects that this sentence WAS
-            # heard, while the next loop iteration's stop check (above)
-            # correctly stops before the one after it.
+        # The floor follows the configured speaking rate when that is the faster one.
+        fastest = max(self._positive_option("fastest_chars_per_second", FASTEST_CHARS_PER_SECOND),
+                      self._positive_option("chars_per_second", SPOKEN_CHARS_PER_SECOND))
+        window = _ReadAhead(self._positive_option("read_ahead", READ_AHEAD),
+                            **{"fastest": fastest, **self._read_ahead_timing})
+
+        def mark_heard():
+            # Only what the client is done with: a sentence sent ahead and
+            # dropped by a pause is read again on "continue".
             with self._state_lock:
                 entry = self._session_entry(reading.session_id, create=True)
-                entry["progress"][key] = i + 1
+                entry["progress"][key] = bookmark + window.heard
                 entry["progress_splitter"][key] = SPLITTER_VERSION
+
+        def on_end(m):
+            if _session_id(m) == reading.session_id:
+                window.ended()
+
+        self.bus.on("recognizer_loop:audio_output_end", on_end)
+        try:
+            for i, sentence in enumerate(sentences[bookmark:], start=bookmark):
+                window.wait_for_room(reading.stopped)
+                mark_heard()
+                if reading.stopped.is_set():
+                    break
+                window.sent(sentence, self._spoken_wait(sentence))
+                # speak(), not speak_dialog(): the dialog renderer treats its
+                # argument as a template name and, finding none, speaks the name
+                # with every '.' replaced by a space - the full stop that ends
+                # the sentence, "Mr. Fox", "3.5" - and a sentence that happens to
+                # equal a dialog name would be swapped for that dialog.
+                if narrating:
+                    pause = STORY_START_BREAK_MS if i == bookmark else \
+                        PARAGRAPH_BREAK_MS if i in paragraph_starts else 0
+                    self._speak_ssml(sentence, narrate(sentence, pause))
+                else:
+                    self.speak(sentence)
+            # The end is said after the last sentence, not over it.
+            window.wait_for_room(reading.stopped, until_empty=True)
+            mark_heard()
+        finally:
+            self.bus.remove("recognizer_loop:audio_output_end", on_end)
 
         if reading.stopped.is_set():
             return  # stopped or paused: the bookmark stays for "continue"

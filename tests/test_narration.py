@@ -150,9 +150,9 @@ def test_narration_is_turned_on_by_the_config_or_the_settings(plugin, where):
 
     plugin.speak.assert_not_called()
     calls = plugin._speak_ssml.call_args_list
-    # the plain text is exactly what it was, and so is the wait
+    # the plain text is exactly what it was; the reader paces it, not speak()
     assert [c.args[0] for c in calls] == SENTENCES
-    assert [c.kwargs["wait"] for c in calls] == [module.spoken_wait(s) for s in SENTENCES]
+    assert all("wait" not in c.kwargs for c in calls)
     ssml = [c.args[1] for c in calls]
     assert ssml == [
         f'<speak><break time="{START}ms"/>Once upon a time there was a king.</speak>',

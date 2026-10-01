@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from conftest import (
+    report_end,
     CommonReadingPipeline,
     dispatch_message,
     entry,
@@ -207,6 +208,7 @@ def test_two_sessions_read_at_once_and_one_stops(plugin):
         if session == "alice":
             alice_started.set()
         time.sleep(0.01)
+        report_end(plugin, session)
 
     plugin.speak = speak
     plugin.speak_dialog = MagicMock()

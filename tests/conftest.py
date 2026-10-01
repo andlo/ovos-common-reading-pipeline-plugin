@@ -35,6 +35,15 @@ def session_message(session_id="default", msg_type="test", data=None, lang="en-U
     return Message(msg_type, dict(data or {}), context)
 
 
+def report_end(plugin, session_id="default"):
+    """What a client that reports its playback sends when a sentence is said:
+    recognizer_loop:audio_output_end on the story's session, to whichever
+    reader is listening (the bus is a MagicMock; its on() calls hold them)."""
+    for call in plugin.bus.on.call_args_list:
+        if call.args and call.args[0] == "recognizer_loop:audio_output_end":
+            call.args[1](session_message(session_id, "recognizer_loop:audio_output_end"))
+
+
 def dispatch_message(session_id="default", intent="read_content", data=None, lang="en-US",
                      skill_id="ovos-common-reading-pipeline-plugin.test"):
     """The dispatch ovos-core sends a handler: "<skill_id>:<intent>", the
@@ -62,6 +71,19 @@ def use_real_dialogs(plugin, monkeypatch, lang="en-us"):
     return plugin
 
 
+class VirtualClock:
+    """time.monotonic for _ReadAhead, moved on by its pauses instead of waiting."""
+
+    def __init__(self):
+        self.t = 1000.0
+
+    def now(self):
+        return self.t
+
+    def advance(self, seconds):
+        self.t += seconds
+
+
 @pytest.fixture
 def plugin(monkeypatch):
     p = CommonReadingPipeline.__new__(CommonReadingPipeline)
@@ -73,6 +95,11 @@ def plugin(monkeypatch):
     p._OVOSSkill__responses = {}  # ovos-workshop's get_response bookkeeping, touched by a stop
     monkeypatch.setattr(CommonReadingPipeline, "lang", "en-us", raising=False)
     p._init_state()
+    # Story time is virtual: a sentence nobody reports on is over when its
+    # spoken_wait says so, and the test does not sit through it.
+    clock = VirtualClock()
+    p._read_ahead_timing = {"clock": clock.now, "pause": clock.advance}
+    p.clock = clock
     return p
 
 
