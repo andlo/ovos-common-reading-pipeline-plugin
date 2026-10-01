@@ -1,0 +1,4 @@
+{"utterance": "cuéntame un cuento", "lang": "es-ES", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "cuéntame un cuento de grimm", "lang": "es-ES", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "léeme un cuento de grimm", "lang": "es-ES", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "cuéntame un cuento sobre cenicienta", "lang": "es-ES", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}

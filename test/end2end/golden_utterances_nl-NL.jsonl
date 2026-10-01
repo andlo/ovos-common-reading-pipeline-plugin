@@ -1,0 +1,4 @@
+{"utterance": "lees me een sprookje voor", "lang": "nl-NL", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "vertel me een verhaal van grimm", "lang": "nl-NL", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "lees me een grimm-verhaal", "lang": "nl-NL", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "vertel me een verhaal over assepoester", "lang": "nl-NL", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}

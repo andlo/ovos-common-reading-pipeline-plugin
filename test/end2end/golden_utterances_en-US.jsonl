@@ -1,0 +1,22 @@
+{"utterance": "tell me a story", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "tell me a fairy tale", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "read me a bedtime story", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "can you tell me another story", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "tell me a story please", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "tell me a story from grimm", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "read me a grimm story", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "read me a story by hans christian andersen", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "read latest post from ovosblog", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "find cinderella from archive", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "tell me the story about the little mermaid from andersen", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "tell me a story about cinderella", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "tell me the story about the little mermaid", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "tell me a fairytale about the ugly duckling", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "can you read me an article about boiling an egg", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "tell me my leo horoscope", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "tell me the little mermaid", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "read the snow queen", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "read me my horoscope", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_type"}
+{"utterance": "read me today's horoscope", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_type"}
+{"utterance": "read me my almanac", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_type"}
+{"utterance": "read me an article", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_type"}

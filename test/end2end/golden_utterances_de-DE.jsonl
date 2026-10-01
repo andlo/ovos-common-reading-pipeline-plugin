@@ -1,0 +1,7 @@
+{"utterance": "erzähl mir eine Geschichte", "lang": "de-DE", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "lies mir ein Märchen vor", "lang": "de-DE", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "kannst du mir eine Geschichte vorlesen", "lang": "de-DE", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "erzähl uns bitte eine Geschichte", "lang": "de-DE", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "erzähl mir eine geschichte von grimm", "lang": "de-DE", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "lies mir eine grimm-Geschichte", "lang": "de-DE", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "erzähl mir eine geschichte über aschenputtel", "lang": "de-DE", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}

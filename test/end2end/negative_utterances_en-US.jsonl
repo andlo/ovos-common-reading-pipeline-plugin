@@ -1,0 +1,13 @@
+{"utterance": "tell me a joke", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "tell me about abraham lincoln", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "what is my horoscope", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "tell me the weather", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "can you tell me the weather right now", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "tell me the time", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "tell me the current year", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "can you tell me the day of the month", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "tell me today's weather report", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "read my messages", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "read the shopping list", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "read me my emails", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
+{"utterance": "read me the news", "lang": "en-US", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": null}
