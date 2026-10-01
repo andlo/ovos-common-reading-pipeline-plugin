@@ -1,0 +1,4 @@
+{"utterance": "conta-me uma história", "lang": "pt-PT", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "conta-me uma história de grimm", "lang": "pt-PT", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "lê-me uma história de grimm", "lang": "pt-PT", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "conta-me uma história sobre cinderela", "lang": "pt-PT", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}

@@ -1,0 +1,8 @@
+{"utterance": "raconte-moi une histoire", "lang": "fr-FR", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "raconte moi une histoire", "lang": "fr-FR", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "lis-moi un conte", "lang": "fr-FR", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "peux-tu me raconter une histoire", "lang": "fr-FR", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "raconte-moi une histoire de grimm", "lang": "fr-FR", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "raconte-moi une histoire de cosquin", "lang": "fr-FR", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "raconte-moi une histoire sur cendrillon", "lang": "fr-FR", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "lis-moi une nouvelle sur la mer", "lang": "fr-FR", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}

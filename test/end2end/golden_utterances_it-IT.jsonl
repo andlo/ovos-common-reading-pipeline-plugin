@@ -1,0 +1,4 @@
+{"utterance": "raccontami una fiaba", "lang": "it-IT", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "raccontami una storia di grimm", "lang": "it-IT", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "leggimi una storia di grimm", "lang": "it-IT", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "raccontami una storia su cenerentola", "lang": "it-IT", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}

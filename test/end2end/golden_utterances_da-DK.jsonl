@@ -1,0 +1,12 @@
+{"utterance": "fortæl mig et eventyr", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "læs et eventyr op for mig", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "fortæl en historie for mig", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_any_story"}
+{"utterance": "fortæl mig en historie fra grimm", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "læs mig en grimm-historie", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "læs et eventyr af h c andersen", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_collection"}
+{"utterance": "fortæl mig en historie om askepot", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "fortæl mig historien om den lille havfrue", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "kan du læse mig en historie om askepot", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "læs løvens horoskop", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "læs den grimme ælling", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_content"}
+{"utterance": "læs mit horoskop", "lang": "da-DK", "skill_id": "ovos-common-reading-pipeline-plugin.andlo", "intent_label": "read_by_type"}
