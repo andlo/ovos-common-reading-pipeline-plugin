@@ -13,7 +13,9 @@ The loop runs on its own thread in the plugin (see _start_reading); these
 tests call it directly, on the test's thread, to check what it reads."""
 from unittest.mock import MagicMock
 
-from conftest import CommonReadingPipeline, ContentFetchError, entry, module, session_message
+import pytest
+
+from conftest import CommonReadingPipeline, ContentFetchError, entry, module, report_end, session_message
 
 
 def _candidate(skill_id="ovos-skill-grimm-tales.andlo", content_id="Cinderella", source="grimmstories.com"):
@@ -33,7 +35,8 @@ def _spoken(plugin):
 
 
 def _wire(plugin):
-    plugin.speak = MagicMock()
+    """A client that says each sentence as it arrives and reports it."""
+    plugin.speak = MagicMock(side_effect=lambda *a, **kw: report_end(plugin))
     plugin.speak_dialog = MagicMock()
 
 
@@ -47,21 +50,23 @@ def test_reads_every_sentence_across_multiple_paragraphs(plugin):
 
 
 def test_every_sentence_waits_as_long_as_it_takes_to_say(plugin):
-    """Pacing: each sentence waits for its playback, so a client that
-    reports audio_output_end on the session sets the pace, but only for as
-    long as the sentence takes to say (#41): a client that never reports
-    no longer leaves 15 s of silence after "Yes."."""
-    _wire(plugin)
+    """Pacing with a client that never reports: three sentences go out at
+    once and each is held for as long as it takes to say (#41), so the story
+    is over when the last one could have been said, not 15 s per sentence."""
+    plugin.speak = MagicMock()  # says nothing back
+    plugin.speak_dialog = MagicMock()
     long = ("The king had a daughter who was so beautiful that the sun itself, "
             "which had seen so many things, wondered at her whenever it shone on her face.")
     plugin._fetch_content = MagicMock(return_value=[
         f"Yes. Then the old woman went home, and the girl stayed. {long}"])
+    began = plugin.clock.now()
 
     _read(plugin, _candidate())
 
-    waits = [c.kwargs["wait"] for c in plugin.speak.call_args_list]
-    assert waits == [module.spoken_wait(s) for s in _spoken(plugin)]
+    waits = [module.spoken_wait(s) for s in _spoken(plugin)]
     assert waits == [4, 7, 14]
+    assert all("wait" not in c.kwargs for c in plugin.speak.call_args_list)
+    assert plugin.clock.now() - began == pytest.approx(sum(waits), abs=1.0)
 
 
 def test_sentences_keep_their_full_stops(plugin):
@@ -117,6 +122,7 @@ def test_pausing_mid_single_large_paragraph_preserves_remaining_sentences(plugin
 
     # simulate pausing after the second sentence
     def speak_then_pause_after_two(sentence, **kw):
+        report_end(plugin)  # said, and the client says so
         if plugin.speak.call_count == 2:
             plugin._stop_reading("default")
 
@@ -221,3 +227,30 @@ def test_a_newer_story_in_the_same_session_takes_over(plugin):
     assert plugin._is_reading("default") is True  # the second story
     assert plugin._last_content("default") == second
     plugin.speak_dialog.assert_not_called()
+
+
+def test_pause_tells_the_client_to_drop_what_it_holds_before_saying_paused(plugin):
+    """Up to two sentences wait on the client behind the one being said; told
+    "pause", it must not read them out after "Paused". OVOS's "stop speaking",
+    on the session that paused, goes out before the confirmation."""
+    order = []
+    plugin.bus.emit.side_effect = lambda m: order.append(m.msg_type)
+    plugin._speak_dialog_and_wait = MagicMock(side_effect=lambda key, **kw: order.append(key))
+    plugin._deactivate = MagicMock()
+    plugin._begin_reading(session_message("alice"), _candidate())
+
+    plugin._handle_pause(session_message("alice", "pause"))
+
+    assert order.index("mycroft.audio.speech.stop") < order.index("paused")
+    stop = next(c.args[0] for c in plugin.bus.emit.call_args_list
+                if c.args[0].msg_type == "mycroft.audio.speech.stop")
+    assert stop.context["session"]["session_id"] == "alice"
+
+
+def test_nothing_is_dropped_when_there_is_no_story_to_pause(plugin):
+    plugin._speak_dialog_and_wait = MagicMock()
+
+    plugin._handle_pause(session_message("alice", "pause"))
+
+    assert not [c for c in plugin.bus.emit.call_args_list
+                if c.args and c.args[0].msg_type == "mycroft.audio.speech.stop"]

@@ -57,15 +57,33 @@ def _start(tmp_path, monkeypatch, sentences=SENTENCES, reports_playback=True):
     monkeypatch.setattr(SessionManager, "bus", None)
     SessionManager.connect_to_bus(bus)
 
-    def audio(message):
-        def play():
+    # One voice, as a client has: what it is sent is said in order, one at a
+    # time, however many sentences the reader sends ahead.
+    said = []
+    voice = threading.Condition()
+
+    def speaker():
+        while True:
+            with voice:
+                while not said:
+                    voice.wait()
+                message = said.pop(0)
+            if message is None:
+                return
+            # speak() starts listening for the end just after it emits; an end
+            # that beats it is missed and costs the full 15 s wait (as it would
+            # live), so give it a head start on a loaded machine
+            real_sleep(0.02)
             bus.emit(message.forward("recognizer_loop:audio_output_start"))
             real_sleep(PLAYBACK)
             bus.emit(message.forward("recognizer_loop:audio_output_end"))
-        # speak() starts listening for the end just after it emits; an end
-        # that beats it is missed and costs the full 15 s wait (as it would
-        # live), so give it a head start on a loaded machine
-        threading.Timer(0.02, play).start()
+
+    threading.Thread(target=speaker, daemon=True).start()
+
+    def audio(message):
+        with voice:
+            said.append(message)
+            voice.notify()
 
     def search(message):
         bus.emit(message.reply(COMMON_READING_SEARCH_RESPONSE, {
@@ -79,7 +97,11 @@ def _start(tmp_path, monkeypatch, sentences=SENTENCES, reports_playback=True):
         bus.on("speak", audio)
     bus.on(COMMON_READING_SEARCH, search)
     bus.on(f"{COMMON_READING_FETCH_CONTENT}.{PROVIDER}", fetch)
-    return CommonReadingPipeline(bus=bus), bus
+    plugin = CommonReadingPipeline(bus=bus)
+    # A fake voice says a sentence in PLAYBACK, far faster than the
+    # 30 characters a second no sentence is allowed to beat; let it.
+    plugin._read_ahead_timing = {"fastest": 10_000}
+    return plugin, bus
 
 
 @pytest.fixture
@@ -175,7 +197,8 @@ def test_the_handler_returns_before_the_story_ends(live):
     reading.thread.join(60)
     story = [(t, m) for t, m in signals.of("speak") if m.data["utterance"] in SENTENCES]
     assert [m.data["utterance"] for _, m in story] == SENTENCES
-    assert sum(1 for t, _ in story if t > completed_at) >= len(SENTENCES) - 2
+    # up to READ_AHEAD sentences are already sent when the handler returns
+    assert sum(1 for t, _ in story if t > completed_at) >= len(SENTENCES) - module.READ_AHEAD - 1
 
 
 def test_story_sentences_carry_the_originating_session_and_route(live):
@@ -199,20 +222,26 @@ def test_story_sentences_carry_the_originating_session_and_route(live):
         assert message.data["lang"] == "fr-FR"
 
 
-def test_each_sentence_waits_for_its_own_playback(live):
-    """Pacing: the next sentence goes out only after the client reported
-    the end of the previous one (audio_output_end on that session)."""
+def test_never_more_than_three_sentences_are_out_unsaid(live):
+    """Pacing: the reader sends ahead so the client never waits on the round
+    trip between sentences, but a client holds at most READ_AHEAD sentences
+    it has not finished saying, counted by its audio_output_end."""
     plugin, bus = live
     events = Recorder(bus, "speak", "recognizer_loop:audio_output_end")
 
     _dispatch(plugin, bus, "alice", "read_content", {"title": "rapunzel"})
     plugin._readings["alice"].thread.join(60)
 
-    sequence = [m.msg_type for _, m in events.messages
-                if m.msg_type != "speak" or m.data["utterance"] in SENTENCES]
-    first = sequence.index("speak")
-    for a, b in zip(sequence[first::2], sequence[first + 1::2]):
-        assert (a, b) == ("speak", "recognizer_loop:audio_output_end")
+    held, most = 0, 0
+    reading = False
+    for _, m in events.messages:
+        if m.msg_type == "speak" and m.data["utterance"] in SENTENCES:
+            reading = True
+            held += 1
+            most = max(most, held)
+        elif m.msg_type == "recognizer_loop:audio_output_end" and reading and held:
+            held -= 1
+    assert most == module.READ_AHEAD == 3
 
 
 def test_two_sessions_read_side_by_side_and_stop_separately(live):
@@ -237,10 +266,10 @@ def test_two_sessions_read_side_by_side_and_stop_separately(live):
 
 
 def test_a_client_that_never_reports_playback_waits_each_sentence_its_own_length(quiet):
-    """#41: nothing answers the speaks. Each sentence is waited on for as
-    long as it takes to say, not for wait=True's 15 s: five sentences take
-    about the sum of their sized waits instead of 75 s. The rate is turned
-    up here so every wait is the 1 s floor and the test stays short."""
+    """#41: nothing answers the speaks. Three go out together, and then each
+    sentence is held for as long as it takes to say, not wait=True's 15 s.
+    The rate is turned up here so every wait is the 1 s floor and the test
+    stays short."""
     plugin, bus = quiet
     plugin.config = {"chars_per_second": 1000, "wait_margin": 0}
     speaks = Recorder(bus, "speak")
@@ -252,15 +281,15 @@ def test_a_client_that_never_reports_playback_waits_each_sentence_its_own_length
     assert not reader.is_alive()
     story = [(t, m.data["utterance"]) for t, m in speaks.of("speak") if m.data["utterance"] in SENTENCES]
     assert [u for _, u in story] == SENTENCES[:5]
-    waits = [plugin._spoken_wait(u) for _, u in story]
-    assert waits == [1] * 5
+    assert [plugin._spoken_wait(u) for _, u in story] == [1] * 5
     gaps = [b - a for (a, _), (b, _) in zip(story, story[1:])]
-    assert all(0.9 < gap < 1.5 for gap in gaps), gaps
+    assert all(gap < 0.3 for gap in gaps[:2]), gaps  # read ahead
+    assert all(0.9 < gap < 1.5 for gap in gaps[2:]), gaps  # then one per sentence
 
 
 def test_a_client_that_reports_playback_still_sets_the_pace(live):
-    """The sized wait is only the longest the reader waits: each sentence
-    goes out as soon as the previous one's audio_output_end arrives. Twenty
+    """The sized wait is only the longest a sentence is held: once three are
+    out, the next goes as soon as the client reports the end of one. Twenty
     sentences sized at 6 s each are read in a second or two."""
     plugin, bus = live
     events = Recorder(bus, "speak", "recognizer_loop:audio_output_end")
@@ -272,9 +301,103 @@ def test_a_client_that_reports_playback_still_sets_the_pace(live):
     ends = [t for t, _ in events.of("recognizer_loop:audio_output_end")]
     assert len(story) == len(SENTENCES)
     assert sum(plugin._spoken_wait(s) for s in SENTENCES) >= 100
-    for spoken, following in zip(story, story[1:]):
-        end = min(t for t in ends if t > spoken)
-        assert end < following < end + 0.5
+    assert story[-1] - story[0] < 10
+    for following in story[3:]:
+        end = max(t for t in ends if t <= following)
+        assert following - end < 0.5
+
+
+def test_a_client_that_ends_every_sentence_at_once_cannot_race_the_story(plugin):
+    """2026-10-01, Story Time: a phone on vibrate ended each sentence unsaid
+    within milliseconds, and a reader that waited for nothing else sent the
+    whole story in ten seconds. No sentence is over sooner than a voice could
+    say it, so a client that says nothing gets the story at reading pace."""
+    window = module._ReadAhead(3, 30, clock=plugin.clock.now, pause=plugin.clock.advance)
+    never = threading.Event()
+    sent_at = []
+    for _ in range(6):
+        window.wait_for_room(never)
+        sent_at.append(plugin.clock.now() - 1000)
+        window.sent("x" * 30, 4)
+        window.ended()
+    assert [round(t, 2) for t in sent_at] == [0, 0, 0, 1, 2, 3]
+
+
+def test_a_client_that_reports_nothing_is_paced_by_each_sentence(plugin):
+    window = module._ReadAhead(3, 30, clock=plugin.clock.now, pause=plugin.clock.advance)
+    never = threading.Event()
+    sent_at = []
+    for _ in range(6):
+        window.wait_for_room(never)
+        sent_at.append(plugin.clock.now() - 1000)
+        window.sent("x" * 30, 4)
+    assert [round(t, 2) for t in sent_at] == [0, 0, 0, 4, 8, 12]
+
+
+def test_a_drained_queue_client_is_counted_by_its_utterance_starts(plugin):
+    """ovos-audio reports one audio_output_end per drained queue, so with three
+    sentences held it ends only the last. Each utterance_start finishes what
+    was held before it, and the end credits the sentence actually said."""
+    window = module._ReadAhead(3, 30, clock=plugin.clock.now, pause=plugin.clock.advance)
+    for text in ("One said.", "Two said.", "Three said."):
+        window.sent(text, 4)
+    window.started("<speak>Two said.</speak>")
+    assert window.heard == 1
+    window.started("Three said.")
+    assert window.heard == 2
+    window.ended()
+    assert window.heard == 3
+
+
+def test_speech_that_matches_no_held_sentence_finishes_nothing(plugin):
+    window = module._ReadAhead(3, 30, clock=plugin.clock.now, pause=plugin.clock.advance)
+    window.sent("One said.", 4)
+    window.sent("Two said.", 4)
+    window.started("Your timer is done.")
+    window.started(None)
+    assert window.heard == 0
+
+
+def test_stopping_wakes_a_reader_waiting_for_room(plugin):
+    window = module._ReadAhead(1, 30)
+    stopped = module._Stop()
+    stopped.wake_on_set(window.wake)
+    window.sent("x" * 30, 60)
+    done = threading.Event()
+    threading.Thread(target=lambda: (window.wait_for_room(stopped), done.set()), daemon=True).start()
+    time.sleep(0.1)
+    started = time.monotonic()
+    stopped.set()
+    assert done.wait(0.5) and time.monotonic() - started < 0.5
+
+
+def test_the_window_and_the_floor_come_from_the_plugin_config(plugin):
+    """Both live in mycroft.conf, intents["ovos-common-reading-pipeline-plugin"],
+    like every other option: no value is fixed in the code."""
+    seen = {}
+    real = module._ReadAhead
+
+    def spy(size, fastest=module.FASTEST_CHARS_PER_SECOND, **timing):
+        seen.update(size=size, fastest=fastest)
+        return real(size, fastest, **timing)
+
+    plugin._read_ahead_timing = {}
+    plugin.speak = lambda *a, **kw: None
+    plugin.speak_dialog = lambda *a, **kw: None
+    plugin._fetch_content = lambda *a, **kw: []
+    plugin.config = {"read_ahead": 1, "fastest_chars_per_second": 50}
+    module._ReadAhead, saved = spy, module._ReadAhead
+    try:
+        reading = plugin._begin_reading(session_message(), {"skill_id": "p.a", "content_id": "c", "title": "T"})
+        plugin._read_content(session_message(), reading, 0)
+    finally:
+        module._ReadAhead = saved
+    assert seen == {"size": 1, "fastest": 50}
+
+
+def test_a_window_of_one_is_the_old_pace(plugin):
+    assert module._ReadAhead(1).size == 1
+    assert module._ReadAhead(0).size == 1  # never less than one
 
 
 def test_narrated_sentences_carry_ssml_beside_the_same_text(live):

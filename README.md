@@ -110,6 +110,8 @@ when `mycroft.conf` doesn't set them:
   "ovos-common-reading-pipeline-plugin": {
     "narration": "ssml",
     "chars_per_second": 14,
+    "read_ahead": 3,
+    "fastest_chars_per_second": 30,
     "wait_margin": 3
   }
 }
@@ -119,6 +121,8 @@ when `mycroft.conf` doesn't set them:
 |---|---|---|
 | `narration` | off | `"ssml"` sends each sentence with an SSML version beside it (see [Narration](#narration)) |
 | `chars_per_second` | `14` | speaking rate the wait after each line is sized with (see below) |
+| `read_ahead` | `3` | sentences a client may hold that it has not finished saying, so the next starts the moment one ends; `1` sends one at a time (see [How a request is handled](#how-a-request-is-handled)) |
+| `fastest_chars_per_second` | `30` | no sentence counts as said sooner than a voice this fast could say it, so a client that ends sentences without saying them gets the story at reading pace (see [How a request is handled](#how-a-request-is-handled)) |
 | `wait_margin` | `3` | seconds added to that wait, for synthesis |
 
 ### How a request is recognised
@@ -169,24 +173,36 @@ Only "continue" and "pause" are still padacioso intents.
   (`mycroft.skill.handler.complete`, then `ovos.utterance.handled`),
   about two seconds after the request (the search window), so "stop",
   "pause" and anything else reach the assistant while the story plays.
-- The story is read on a background thread, one sentence at a time.
-  Each sentence is forwarded from the request that started the story,
-  so it carries that request's session and route, and each waits for
-  that session's `recognizer_loop:audio_output_end` before the next one
-  goes out. A client that reports its playback paces the story. One
-  that doesn't is waited on for as long as the sentence takes to say:
-  its length at `chars_per_second` plus `wait_margin`, rounded up to
-  whole seconds and never more than 15 s (see
+- The story is read on a background thread, a sentence at a time and
+  `read_ahead` (3) sentences ahead. Each sentence is forwarded from the
+  request that started the story, so it carries that request's session
+  and route. A client holds at most `read_ahead` sentences it has not
+  finished saying, so it can start the next the moment one ends instead
+  of waiting out a round trip; each `recognizer_loop:audio_output_end`
+  on that session finishes the oldest. A client that doesn't report is
+  waited on for as long as each sentence takes to say: its length at
+  `chars_per_second` plus `wait_margin`, rounded up to whole seconds and
+  never more than 15 s (see
   [#41](https://github.com/andlo/ovos-common-reading-pipeline-plugin/issues/41)).
+  No sentence is over sooner than a voice at `fastest_chars_per_second`
+  could say it, whatever the client reports: a phone on vibrate that
+  ended every sentence unsaid within milliseconds used to receive the
+  whole story in seconds. The bookmark counts what the client finished,
+  so "continue" repeats a sentence that was sent ahead and never said.
   The announcement and the other lines the plugin waits on are sized
   the same way.
+- On "pause" and "stop" the session is sent `mycroft.audio.speech.stop`
+  before the confirmation, so a client drops the sentences it holds
+  instead of reading them after "Paused".
 
 **If you write a client** that plays speech itself (a HiveMind
 satellite, a phone app), send `recognizer_loop:audio_output_start` when
 a line starts playing and `recognizer_loop:audio_output_end` when it
 ends, with the session of the `speak` it came from in the context.
 That is what lets the story go on the moment a sentence ends; without
-it, the plugin can only guess how long each sentence takes.
+it, the plugin can only guess how long each sentence takes. Say the
+sentences you are sent in order, one at a time, and drop the ones still
+queued on `mycroft.audio.speech.stop`.
 
 ### Narration
 

@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 from ovos_bus_client.session import Session
 
-from conftest import CommonReadingPipeline, REPO_ROOT, dispatch_message, use_real_dialogs
+from conftest import report_end, CommonReadingPipeline, REPO_ROOT, dispatch_message, use_real_dialogs
 
 LOCALES = sorted(p.name for p in (Path(REPO_ROOT) / "locale").iterdir() if p.is_dir())
 SOURCE = "Project Gutenberg"
@@ -47,6 +47,7 @@ def _listen(plugin, narration=None, on_line=None):
         heard.append(utterance)
         if on_line:
             on_line(utterance)
+        report_end(plugin)  # said, and the client says so
 
     plugin.speak = MagicMock(side_effect=hear)
     plugin._speak_ssml = MagicMock(side_effect=hear)
@@ -131,7 +132,8 @@ def test_a_paused_story_names_its_source_when_it_is_finished(plugin, monkeypatch
     plugin._handle_continue(dispatch_message(intent="continue"))
 
     plugin.log.exception.assert_not_called()
-    assert heard[1:-1] == SENTENCES[2:]
+    # the sentence the pause cut off was not heard, so it is read again
+    assert heard[1:-1] == SENTENCES[1:]
     assert _said_the_source(heard) == [heard[-1]]
     assert heard[-1] in _closing_lines("en-us")
 
