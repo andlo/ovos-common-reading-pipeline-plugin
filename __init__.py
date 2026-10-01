@@ -493,6 +493,22 @@ def _session_id(message: Optional[Message]) -> str:
         return DEFAULT_SESSION_ID
 
 
+class _Stop(threading.Event):
+    """An Event that also wakes whoever registered to be woken when it is set."""
+
+    def __init__(self):
+        super().__init__()
+        self._wakers = []
+
+    def wake_on_set(self, waker):
+        self._wakers.append(waker)
+
+    def set(self):
+        super().set()
+        for waker in list(self._wakers):
+            waker()
+
+
 class _Reading:
     """One session's story in progress.
 
@@ -510,8 +526,14 @@ class _Reading:
         self.candidate = candidate
         self.message = message
         self.lang = lang
-        self.stopped = threading.Event()
+        self.stopped = _Stop()
         self.thread: Optional[threading.Thread] = None
+
+
+def _plain(text) -> str:
+    """Text without markup or spacing, for matching what was sent to what a
+    client reports saying."""
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", str(text or ""))).strip()
 
 
 class _ReadAhead:
@@ -540,7 +562,26 @@ class _ReadAhead:
     def sent(self, text: str, wait_seconds: float):
         with self._changed:
             self._held.append({"sent": self.clock(), "shortest": len(text) / self.fastest,
-                               "longest": float(wait_seconds), "start": None, "ended": None})
+                               "longest": float(wait_seconds), "start": None, "ended": None,
+                               "text": _plain(text)})
+
+    def started(self, utterance: str):
+        """The client began saying `utterance`: every sentence held before the
+        one it matches is over. ovos-audio reports one end per drained queue,
+        not per sentence, so its starts are the only per-sentence signal.
+        Speech that matches no held sentence (a timer, say) changes nothing."""
+        spoken = _plain(utterance)
+        if not spoken:
+            return
+        with self._changed:
+            for index, held in enumerate(self._held):
+                if held["text"] and (held["text"] in spoken or spoken in held["text"]):
+                    now = self.clock()
+                    for before in self._held[:index]:
+                        if before["ended"] is None:
+                            before["ended"] = now
+                    self._changed.notify_all()
+                    return
 
     def ended(self):
         with self._changed:
@@ -562,6 +603,10 @@ class _ReadAhead:
                     break
                 reported += 1
             return self.finished + reported
+
+    def wake(self):
+        with self._changed:
+            self._changed.notify_all()
 
     def _over_at(self, held) -> float:
         """When the front sentence is over: reported (or timed out), and
@@ -1728,6 +1773,8 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         window = _ReadAhead(self._positive_option("read_ahead", READ_AHEAD),
                             **{"fastest": fastest, **self._read_ahead_timing})
 
+        reading.stopped.wake_on_set(window.wake)
+
         def mark_heard():
             # Only what the client is done with: a sentence sent ahead and
             # dropped by a pause is read again on "continue".
@@ -1737,10 +1784,17 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
                 entry["progress_splitter"][key] = SPLITTER_VERSION
 
         def on_end(m):
-            if _session_id(m) == reading.session_id:
+            # A pause or stop makes ovos-audio cut the sentence off and report
+            # its end; that sentence was not heard.
+            if _session_id(m) == reading.session_id and not reading.stopped.is_set():
                 window.ended()
 
+        def on_start(m):
+            if _session_id(m) == reading.session_id and not reading.stopped.is_set():
+                window.started((m.data or {}).get("utterance"))
+
         self.bus.on("recognizer_loop:audio_output_end", on_end)
+        self.bus.on("recognizer_loop:utterance_start", on_start)
         try:
             for i, sentence in enumerate(sentences[bookmark:], start=bookmark):
                 window.wait_for_room(reading.stopped)
@@ -1764,6 +1818,7 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
             mark_heard()
         finally:
             self.bus.remove("recognizer_loop:audio_output_end", on_end)
+            self.bus.remove("recognizer_loop:utterance_start", on_start)
 
         if reading.stopped.is_set():
             return  # stopped or paused: the bookmark stays for "continue"

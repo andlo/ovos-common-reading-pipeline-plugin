@@ -334,6 +334,43 @@ def test_a_client_that_reports_nothing_is_paced_by_each_sentence(plugin):
     assert [round(t, 2) for t in sent_at] == [0, 0, 0, 4, 8, 12]
 
 
+def test_a_drained_queue_client_is_counted_by_its_utterance_starts(plugin):
+    """ovos-audio reports one audio_output_end per drained queue, so with three
+    sentences held it ends only the last. Each utterance_start finishes what
+    was held before it, and the end credits the sentence actually said."""
+    window = module._ReadAhead(3, 30, clock=plugin.clock.now, pause=plugin.clock.advance)
+    for text in ("One said.", "Two said.", "Three said."):
+        window.sent(text, 4)
+    window.started("<speak>Two said.</speak>")
+    assert window.heard == 1
+    window.started("Three said.")
+    assert window.heard == 2
+    window.ended()
+    assert window.heard == 3
+
+
+def test_speech_that_matches_no_held_sentence_finishes_nothing(plugin):
+    window = module._ReadAhead(3, 30, clock=plugin.clock.now, pause=plugin.clock.advance)
+    window.sent("One said.", 4)
+    window.sent("Two said.", 4)
+    window.started("Your timer is done.")
+    window.started(None)
+    assert window.heard == 0
+
+
+def test_stopping_wakes_a_reader_waiting_for_room(plugin):
+    window = module._ReadAhead(1, 30)
+    stopped = module._Stop()
+    stopped.wake_on_set(window.wake)
+    window.sent("x" * 30, 60)
+    done = threading.Event()
+    threading.Thread(target=lambda: (window.wait_for_room(stopped), done.set()), daemon=True).start()
+    time.sleep(0.1)
+    started = time.monotonic()
+    stopped.set()
+    assert done.wait(0.5) and time.monotonic() - started < 0.5
+
+
 def test_the_window_and_the_floor_come_from_the_plugin_config(plugin):
     """Both live in mycroft.conf, intents["ovos-common-reading-pipeline-plugin"],
     like every other option: no value is fixed in the code."""

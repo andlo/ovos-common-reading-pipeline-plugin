@@ -132,7 +132,8 @@ def test_a_paused_story_names_its_source_when_it_is_finished(plugin, monkeypatch
     plugin._handle_continue(dispatch_message(intent="continue"))
 
     plugin.log.exception.assert_not_called()
-    assert heard[1:-1] == SENTENCES[2:]
+    # the sentence the pause cut off was not heard, so it is read again
+    assert heard[1:-1] == SENTENCES[1:]
     assert _said_the_source(heard) == [heard[-1]]
     assert heard[-1] in _closing_lines("en-us")
 
