@@ -197,7 +197,8 @@ def test_the_handler_returns_before_the_story_ends(live):
     reading.thread.join(60)
     story = [(t, m) for t, m in signals.of("speak") if m.data["utterance"] in SENTENCES]
     assert [m.data["utterance"] for _, m in story] == SENTENCES
-    assert sum(1 for t, _ in story if t > completed_at) >= len(SENTENCES) - 2
+    # up to READ_AHEAD sentences are already sent when the handler returns
+    assert sum(1 for t, _ in story if t > completed_at) >= len(SENTENCES) - module.READ_AHEAD - 1
 
 
 def test_story_sentences_carry_the_originating_session_and_route(live):
