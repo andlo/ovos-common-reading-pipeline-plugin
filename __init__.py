@@ -221,6 +221,29 @@ FASTEST_CHARS_PER_SECOND = 30
 # migrate_bookmark) instead of resuming a few sentences off.
 SPLITTER_VERSION = 2
 
+# Who reads the story aloud (setting "player"):
+#   "speak"      this plugin, a sentence at a time through ovos-audio (default)
+#   "ovos-media" the media player: the story is handed to ovos-media as a
+#                playlist of sentences with tts// uris (ovos-ocp-tts-plugin
+#                renders each through ovos-audio), so pause, resume, next and
+#                previous sentence and the now-playing screen are the player's.
+#                This plugin keeps its own words ("read me ...", "continue",
+#                "pause") in every language and passes pause/continue on.
+#                See OpenVoiceOS/ovos-media#240.
+PLAYER_SPEAK = "speak"
+PLAYER_OVOS_MEDIA = "ovos-media"
+OCP_PLAY = "ovos.common_play.play"
+OCP_PAUSE = "ovos.common_play.pause"
+OCP_RESUME = "ovos.common_play.resume"
+# ovos-media reports its state after every change of track: playlist_position
+# is the sentence being read, so it moves the bookmark
+OCP_STATUS = "ovos.common_play.status"
+OCP_STATUS_RESPONSE = "ovos.common_play.status.response"
+OCP_PAUSED = 2  # ovos_utils.ocp.PlayerState.PAUSED
+# ovos-media says this dialog only when a queue has played to its end (never
+# on a stop): the story has been read to the end
+OCP_QUEUE_FINISHED_DIALOG = "queue_finished"
+
 # A '.' after one of these is not the end of a sentence ("Mr. Fox", "z.B.").
 # Lower case, without the final dot. Deliberately no bare "no": "No." is a
 # whole sentence of dialogue far more often than an abbreviation of "number".
@@ -678,6 +701,10 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         self._reading_words_cache = {}  # locale folder name -> reading.json, normalised
         self._rejected_options = set()  # (key, value) already warned about
         self._read_ahead_timing = {}  # clock/pause for _ReadAhead; tests make time virtual
+        # the story ovos-media is reading ("player": "ovos-media"): one at a
+        # time, as there is one player
+        self._media: Optional[dict] = None
+        self._media_listening = False
 
     def _register_intent_handlers(self):
         """Register a handler for every match type match() can return.
@@ -1149,7 +1176,8 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
                     # nothing in progress in this session - decline, so a
                     # later pipeline stage gets its chance
                     continue
-                if name == "pause" and not self._is_reading(session_id):
+                if name == "pause" and not (self._is_reading(session_id) or
+                                            self._reads_through_media(session_id)):
                     continue
                 return self._claim(name, {}, utterance)
 
@@ -1349,6 +1377,11 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
 
         It waits for the dialog for the same reason as stop_session() - see
         the comment there."""
+        if self._reads_through_media(_session_id(message)):
+            # the player has the story and keeps its place
+            self.bus.emit(message.forward(OCP_PAUSE, {}))
+            self._speak_dialog_and_wait('paused')
+            return
         if self._stop_reading(_session_id(message)) is not None:
             self._drop_read_ahead()
             self._deactivate(message)
@@ -1359,6 +1392,14 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         session_id = _session_id(message)
         if self._is_reading(session_id):
             return  # already reading - a second reader would read over the first
+        if self._reads_through_media(session_id) and self._media_is_paused():
+            # the player paused it where it was; it carries on from there
+            last = self._last_content(session_id) or {}
+            self._speak_dialog_and_wait('continue', data={"title": last.get("title", "")})
+            self.bus.emit(message.forward(OCP_RESUME, {}))
+            return
+        # otherwise (stopped, or read by this plugin) it starts again at its
+        # bookmark, which the player's progress has kept up to date
         last = self._last_content(session_id)
         if not last:
             # match() saw something to continue, but it finished since
@@ -1729,6 +1770,127 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
         finally:
             self._store_settings()
 
+    # --- reading through ovos-media (setting "player": "ovos-media") ------------------
+
+    def _player(self) -> str:
+        return str(self._option("player", PLAYER_SPEAK)).strip().lower()
+
+    def _reads_through_media(self, session_id: str) -> bool:
+        """This session's last story was handed to ovos-media, so "pause"
+        and "continue" are the player's to do."""
+        with self._state_lock:
+            entry = self._session_entry(session_id)
+            return bool(entry and entry.get("media_reading"))
+
+    def _hand_to_media(self, message: Optional[Message], reading: _Reading,
+                       sentences: List[str], bookmark: int) -> bool:
+        """Hand the story to ovos-media as a playlist of sentences, starting
+        at `bookmark`. Each entry's tts// uri is rendered in the device's
+        voice by ovos-ocp-tts-plugin through ovos-audio, so the player does
+        pause, resume, next and previous sentence, and shows what is read
+        on its now-playing screen. False (and the story is read the usual
+        way) when the extractor is not installed."""
+        try:
+            from ovos_ocp_tts_plugin import tts_uri
+        except ImportError:
+            self.log.error("player is ovos-media, but ovos-ocp-tts-plugin is not installed: "
+                           "reading it aloud the usual way")
+            return False
+        if not sentences:
+            return False
+        from ovos_utils.ocp import MediaEntry, MediaType, PlaybackType
+        candidate = reading.candidate
+        lang = reading.lang or self.lang
+        shared = {"title": candidate.get("title") or "",
+                  "artist": candidate.get("author") or "",
+                  "image": candidate.get("image") or "",
+                  "playback": PlaybackType.AUDIO,
+                  # mediavocab BOOK; ovos_utils' OCP types have no BOOK, and
+                  # ocp-pipeline maps BOOK to AUDIOBOOK on this side
+                  "media_type": MediaType.AUDIOBOOK,
+                  "skill_id": self.skill_id}
+        playlist = [MediaEntry(uri=tts_uri(sentence, lang), **shared).as_dict
+                    for sentence in sentences]
+        start = playlist[min(bookmark, len(playlist) - 1)]
+        if reading.stopped.is_set():
+            return True  # stopped before it started: nothing to hand over
+        data = {"media": start, "playlist": playlist}
+        play = message.forward(OCP_PLAY, data) if message else Message(OCP_PLAY, data)
+        with self._state_lock:
+            self._session_entry(reading.session_id, create=True)["media_reading"] = True
+            self._media = {"session_id": reading.session_id, "candidate": candidate,
+                           "key": self._progress_key(candidate), "size": len(playlist),
+                           "title": shared["title"], "position": min(bookmark, len(playlist) - 1),
+                           "message": message}
+        self._follow_media()
+        self.bus.emit(play)
+        # the player has it now: this plugin is no longer reading it, but
+        # keeps it as the session's last story for "continue"
+        self._finish_reading(message, reading)
+        return True
+
+    def _follow_media(self):
+        """Listen to the player once: its status moves the bookmark, and its
+        end-of-queue dialog says the story has been read to the end."""
+        if self._media_listening:
+            return
+        self._media_listening = True
+        self.bus.on(OCP_STATUS_RESPONSE, self._on_media_status)
+        for topic in {SPEAK_TOPIC, "speak"}:
+            self.bus.on(topic, self._on_media_speak)
+
+    def _on_media_status(self, message: Message):
+        """The player moved to another sentence of the story: that many have
+        been heard, so that is where "continue" starts after a stop."""
+        data = message.data or {}
+        with self._state_lock:
+            media = self._media
+            if not media or data.get("playlist_size") != media["size"] or \
+                    data.get("title") != media["title"]:
+                return  # not the story
+            position = data.get("playlist_position")
+            if not isinstance(position, int) or position == media["position"]:
+                return
+            media["position"] = position
+            entry = self._session_entry(media["session_id"], create=True)
+            entry["progress"][media["key"]] = position
+            entry["progress_splitter"][media["key"]] = SPLITTER_VERSION
+        self._store_settings()
+
+    def _on_media_speak(self, message: Message):
+        """The player says its queue has finished: when that was on the
+        story's last sentence, the story is over, as if read here."""
+        if ((message.data or {}).get("meta") or {}).get("dialog") != OCP_QUEUE_FINISHED_DIALOG:
+            return
+        with self._state_lock:
+            media = self._media
+            if not media or media["position"] != media["size"] - 1:
+                return
+            self._media = None
+            entry = self._session_entry(media["session_id"], create=True)
+            entry["progress"].pop(media["key"], None)
+            entry["progress_splitter"].pop(media["key"], None)
+            entry.pop("media_reading", None)
+            if entry.get("last_content") == media["candidate"]:
+                entry["last_content"] = None
+                entry.pop("last_lang", None)
+            self._forget_session_if_empty(media["session_id"])
+        self._store_settings()
+        self._say_finished(media["message"], media["candidate"])
+
+    def _say_finished(self, message: Optional[Message], candidate: dict):
+        """The story's closing line (with its source), to the session that
+        asked for it (speak_dialog() finds its context in `message`)."""
+        if candidate.get("source"):
+            self.speak_dialog('finished_reading', data={"source": candidate["source"]})
+        else:
+            self.speak_dialog('finished_reading_unsourced')
+
+    def _media_is_paused(self) -> bool:
+        """Whether the player is paused (rather than stopped or gone)."""
+        reply = self.bus.wait_for_response(Message(OCP_STATUS), OCP_STATUS_RESPONSE, timeout=1.0)
+        return bool(reply) and (reply.data or {}).get("player_state") == OCP_PAUSED
+
     def _read_sentences(self, message: Optional[Message], reading: _Reading, bookmark):
         candidate = reading.candidate
         try:
@@ -1767,6 +1929,13 @@ class CommonReadingPipeline(ConfidenceMatcherPipeline, OVOSAbstractApplication):
             versions = self._session_entry(reading.session_id, create=True)["progress_splitter"]
             if bookmark and versions.get(key) != SPLITTER_VERSION:
                 bookmark = migrate_bookmark(paragraphs, bookmark)
+
+        if self._player() == PLAYER_OVOS_MEDIA and \
+                self._hand_to_media(message, reading, sentences, bookmark):
+            return
+        with self._state_lock:
+            entry = self._session_entry(reading.session_id, create=True)
+            entry.pop("media_reading", None)
         # The floor follows the configured speaking rate when that is the faster one.
         fastest = max(self._positive_option("fastest_chars_per_second", FASTEST_CHARS_PER_SECOND),
                       self._positive_option("chars_per_second", SPOKEN_CHARS_PER_SECOND))
