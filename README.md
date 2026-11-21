@@ -124,6 +124,25 @@ when `mycroft.conf` doesn't set them:
 | `read_ahead` | `3` | sentences a client may hold that it has not finished saying, so the next starts the moment one ends; `1` sends one at a time (see [How a request is handled](#how-a-request-is-handled)) |
 | `fastest_chars_per_second` | `30` | no sentence counts as said sooner than a voice this fast could say it, so a client that ends sentences without saying them gets the story at reading pace (see [How a request is handled](#how-a-request-is-handled)) |
 | `wait_margin` | `3` | seconds added to that wait, for synthesis |
+| `player` | `"speak"` | who reads the story aloud: `"speak"` is this plugin, a sentence at a time; `"ovos-media"` hands it to the media player (see [Reading through ovos-media](#reading-through-ovos-media)) |
+
+### Reading through ovos-media
+
+With `"player": "ovos-media"` the story is handed to
+[ovos-media](https://github.com/OpenVoiceOS/ovos-media) as a playlist with one entry per sentence. Each entry's uri
+is `tts//<lang>/<sentence>`, which [ovos-ocp-tts-plugin](https://github.com/emkay-voice/ovos-ocp-tts-plugin) renders in
+the device's own voice through ovos-audio, so no second TTS engine is loaded. The player then does what players do:
+pause and resume, next and previous sentence ("go back a bit"), and the now-playing screen with the title, author
+and picture.
+
+This plugin keeps its own words: nobody *plays* The Little Mermaid, so "read me the little mermaid", "pause the
+story" and "continue the story" are still recognised here, in every language it speaks, and pause and continue are
+passed on to the player. A story starts at its bookmark; from there the player keeps its place.
+
+It needs ovos-media running (with `"enable_old_audioservice": false`) and `ovos-ocp-tts-plugin` installed; without
+the plugin the story is read the usual way. This is a first version, discussed in
+[OpenVoiceOS/ovos-media#240](https://github.com/OpenVoiceOS/ovos-media/issues/240): narration (SSML pauses) is not
+passed on yet, and the bookmark is not moved on while the player reads.
 
 ### How a request is recognised
 
