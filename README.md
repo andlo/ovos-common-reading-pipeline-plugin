@@ -137,12 +137,14 @@ and picture.
 
 This plugin keeps its own words: nobody *plays* The Little Mermaid, so "read me the little mermaid", "pause the
 story" and "continue the story" are still recognised here, in every language it speaks, and pause and continue are
-passed on to the player. A story starts at its bookmark; from there the player keeps its place.
+passed on to the player. A story starts at its bookmark, and the bookmark follows the player (ovos-media reports
+which sentence it is on): "continue" resumes a paused player, and after a stop the story starts again where it was.
+When the player has read the last sentence, the story closes with its source, as when this plugin reads it.
 
 It needs ovos-media running (with `"enable_old_audioservice": false`) and `ovos-ocp-tts-plugin` installed; without
 the plugin the story is read the usual way. This is a first version, discussed in
-[OpenVoiceOS/ovos-media#240](https://github.com/OpenVoiceOS/ovos-media/issues/240): narration (SSML pauses) is not
-passed on yet, and the bookmark is not moved on while the player reads.
+[OpenVoiceOS/ovos-media#240](https://github.com/OpenVoiceOS/ovos-media/issues/240). Not yet: narration (SSML pauses)
+is not passed on, and ovos-media says its own "end of the queue" before the story's closing line.
 
 ### How a request is recognised
 
