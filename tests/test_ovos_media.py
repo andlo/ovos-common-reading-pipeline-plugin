@@ -64,6 +64,18 @@ def test_a_bookmark_starts_the_player_where_it_stopped(media):
     assert len(play.data["playlist"]) == len(SENTENCES)
 
 
+def test_the_player_shows_the_book_its_author_and_cover(media):
+    plugin, bus = media
+    seen = Recorder(bus, module.OCP_PLAY)
+    cover = "https://books.example.com/covers/ivanov.jpg"
+    reading = plugin._begin_reading(None, {"skill_id": PROVIDER, "content_id": "rapunzel", "title": "Ivanov",
+                                           "author": "Anton Chekhov", "image": cover}, "en-US")
+    plugin._read_sentences(None, reading, 0)
+    [(_, play)] = seen.of(module.OCP_PLAY)
+    for entry in play.data["playlist"]:
+        assert (entry["title"], entry["artist"], entry["image"]) == ("Ivanov", "Anton Chekhov", cover)
+
+
 class FakePlayer:
     """ovos-media as far as the plugin sees it: it answers "status", reports
     its status when it moves to another track, and says its queue_finished
